@@ -268,6 +268,12 @@ export interface RepairJob {
   updatedAt: string;
 }
 
+/** GET /api/metrics/levels: Level 2 and Level 3 counts from stored records. */
+export interface LevelSummary {
+  codebase: { assessments: number; proposals: number; validated: number; validationFailed: number; pullRequests: number; pullRequestsOnAcknowledgedFailures: number };
+  liveUrl: { investigations: number; withRepository: number; failed: number; latestAt: string | null; latestTarget: string | null; latestStatus: string | null };
+}
+
 export interface DashboardSummary {
   connectedApplications: number;
   healthyServices: number;

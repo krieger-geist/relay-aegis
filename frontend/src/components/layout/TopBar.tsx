@@ -6,7 +6,7 @@ import { apiGet } from '@/lib/api/client';
 import { useAuth } from '@/features/auth/authContext';
 import type { Application, Incident } from '@/types/domain';
 import '@/styles/ui-enhancements.css';
-import { acknowledgeIncidents, isOpenIncident, useAcknowledgedIncidents } from '@/lib/incidentNotifications';
+import { isOpenIncident, useAcknowledgeIncidents, useAcknowledgedIncidents } from '@/lib/incidentNotifications';
 
 const titles: Record<string, string> = {
   '/': 'Overview',
@@ -87,7 +87,9 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [theme, setTheme] = useState<Theme>(readTheme);
   const [searchEnvironment, setSearchEnvironment] = useState<SearchEnvironment>(readSearchEnvironment);
-  const readNotificationIds = useAcknowledgedIncidents();
+  const acknowledged = useAcknowledgedIncidents();
+  const readNotificationIds = acknowledged.ids;
+  const acknowledgeIncidents = useAcknowledgeIncidents();
   const [toast, setToast] = useState<ToastMessage>(null);
   const searchAnchorRef = useRef<HTMLDivElement>(null);
   const notificationsAnchorRef = useRef<HTMLDivElement>(null);
@@ -160,7 +162,7 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
   const sortedNotifications = useMemo(() => [...incidents]
     .sort((a, b) => new Date(b.detectedAt).getTime() - new Date(a.detectedAt).getTime())
     .slice(0, 6), [incidents]);
-  const unreadCount = incidents.filter((incident) => isOpenIncident(incident) && !readNotificationIds.includes(incident.id)).length;
+  const unreadCount = acknowledged.ready ? incidents.filter((incident) => isOpenIncident(incident) && !readNotificationIds.includes(incident.id)).length : 0;
   const currentTitle = titles[location.pathname]
     ?? (location.pathname.startsWith('/applications/') ? 'System workspace'
       : location.pathname.startsWith('/incidents/') ? 'Incident investigation'

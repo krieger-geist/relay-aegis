@@ -1,8 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
-import { Activity, ArrowRight, CheckCircle2, CircleAlert, Clock3, Plus, ShieldCheck, ShieldEllipsis, Sparkles } from 'lucide-react';
+import { ArrowRight, CheckCircle2, CircleAlert, Clock3, Plus, ShieldEllipsis, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { MetricCard } from '@/components/data/MetricCard';
 import { ChartDataTableToggle } from '@/components/data/ChartDataTableToggle';
 import { Panel } from '@/components/common/Panel';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -10,8 +9,9 @@ import { StatusBadge } from '@/components/status/StatusBadge';
 import { EmptyState, ErrorState, LoadingState } from '@/components/feedback/States';
 import { apiGet } from '@/lib/api/client';
 import { formatLastCheck, observedStatus } from '@/lib/observation';
-import { acknowledgeIncidents, useAcknowledgedIncidents } from '@/lib/incidentNotifications';
+import { useAcknowledgeIncidents, useAcknowledgedIncidents } from '@/lib/incidentNotifications';
 import type { Application, DashboardSummary, Incident, RecoveryEvent } from '@/types/domain';
+import { LevelCards } from './LevelCards';
 
 export function OverviewPage() {
   const apps = useQuery({ queryKey: ['applications'], queryFn: () => apiGet<Application[]>('/api/applications'), refetchInterval: 10000 });
@@ -19,6 +19,7 @@ export function OverviewPage() {
   const incidents = useQuery({ queryKey: ['incidents'], queryFn: () => apiGet<Incident[]>('/api/incidents'), refetchInterval: 2500 });
   const history = useQuery({ queryKey: ['recovery-history'], queryFn: () => apiGet<RecoveryEvent[]>('/api/recovery-history'), refetchInterval: 10000 });
   const acknowledged = useAcknowledgedIncidents();
+  const acknowledgeIncidents = useAcknowledgeIncidents();
 
   if (apps.isLoading || summary.isLoading || incidents.isLoading || history.isLoading) return <><PageHeader title="Overview" description="Live health observations, incidents, and verified recoveries." /><LoadingState label="Loading overview" /></>;
   if (apps.isError || summary.isError || incidents.isError || history.isError) return <ErrorState detail="The overview data could not be retrieved from the configured API." onRetry={() => { void apps.refetch(); void summary.refetch(); void incidents.refetch(); void history.refetch(); }} />;
@@ -30,20 +31,15 @@ export function OverviewPage() {
   const activeIncidents = incidentData.filter((item) => item.state !== 'recovered');
   const latestIncident = activeIncidents[0] ?? incidentData[0];
   // The attention strip is a notification: once acknowledged (Investigate, or the bell) it stays gone; the incidents remain.
-  const attention = activeIncidents.filter((item) => !acknowledged.includes(item.id));
+  const attention = acknowledged.ready ? activeIncidents.filter((item) => !acknowledged.ids.includes(item.id)) : [];
   const attentionLead = attention[0];
   const responseSeries = summaryData?.responseTimeSeries ?? [];
 
   return (
     <>
-      <PageHeader title="Overview" description="Live health observations, incidents, and verified recoveries across connected systems." actions={<Link to="/applications" className="btn btn-primary"><Plus size={14} /> Connect system</Link>} />
+      <PageHeader title="Overview" description="Runtime health, codebase repairs and live URL investigations, each from recorded evidence." actions={<Link to="/applications" className="btn btn-primary"><Plus size={14} /> Connect system</Link>} />
       {attentionLead ? <div className="attention-strip" role="status" aria-label="Incidents needing attention"><CircleAlert size={18} color="var(--status-active-incident-fg)" /><div><div className="attention-title">{attention.length} incident{attention.length === 1 ? '' : 's'} need{attention.length === 1 ? 's' : ''} attention</div><div className="attention-detail">{attentionLead.applicationName}: {attentionLead.title}. Review evidence before approving recovery.</div></div><div className="attention-spacer" /><Link to={`/incidents/${attentionLead.id}`} className="btn btn-sm" onClick={() => acknowledgeIncidents(attention.map((item) => item.id))}>Investigate <ArrowRight size={13} /></Link></div> : null}
-      <div className="metric-grid">
-        <MetricCard label="Systems connected" value={summaryData?.connectedApplications ?? 0} context="Observed in the last 24 hours" icon={Activity} provenance={summary.data?.provenance ?? 'unavailable'} />
-        <MetricCard label="Currently healthy" value={summaryData?.healthyServices ?? 0} context="Passing their latest configured checks" icon={CheckCircle2} variant="healthy" provenance={summary.data?.provenance ?? 'unavailable'} />
-        <MetricCard label="Active incidents" value={summaryData?.activeIncidents ?? 0} context="Require investigation or action" icon={CircleAlert} variant="incident" provenance={summary.data?.provenance ?? 'unavailable'} />
-        <MetricCard label="Recoveries verified" value={summaryData?.verifiedRecoveries30d ?? 0} context="Post-action verification passed" icon={ShieldCheck} variant="verified" provenance={summary.data?.provenance ?? 'unavailable'} />
-      </div>
+      <LevelCards summary={summaryData} />
 
       <div className="grid-main">
         <Panel title="System health" subtitle="Latest observed status across registered targets" provenance={apps.data?.provenance} action={<Link to="/applications" className="small-link">View all <ArrowRight size={12} style={{ verticalAlign: 'middle' }} /></Link>} bodyClassName="panel-body-tight">

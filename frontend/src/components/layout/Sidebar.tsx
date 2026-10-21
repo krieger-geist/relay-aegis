@@ -34,7 +34,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
   });
   const acknowledged = useAcknowledgedIncidents();
   // Unread attention, not a total: an incident the user has opened or acknowledged no longer counts.
-  const attentionCount = (incidents.data?.data ?? []).filter((incident) => isOpenIncident(incident) && !acknowledged.includes(incident.id)).length;
+  const attentionCount = acknowledged.ready ? (incidents.data?.data ?? []).filter((incident) => isOpenIncident(incident) && !acknowledged.ids.includes(incident.id)).length : 0;
   const health = useQuery({
     queryKey: ['api-health'],
     queryFn: () => apiGet<{ status: string; service: string }>('/api/health'),

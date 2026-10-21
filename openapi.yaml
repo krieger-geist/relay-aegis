@@ -24,6 +24,33 @@ paths:
       responses:
         '200': {description: OK}
         '401': {description: Missing or invalid access token}
+  /api/metrics/levels:
+    get:
+      summary: Level 2 (codebase) and Level 3 (live URL) counts from stored records
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+  /api/notifications/acknowledged:
+    get:
+      summary: Incident ids whose notifications the signed-in user has acknowledged
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+    post:
+      summary: Acknowledge incident notifications for the signed-in user (read state only; incidents are not changed)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [incidentIds]
+              properties:
+                incidentIds: {type: array, maxItems: 200, items: {type: string}}
+      responses:
+        '200': {description: The user's acknowledged incident ids; unknown ids are ignored}
+        '400': {description: More than 200 ids}
+        '401': {description: Missing or invalid access token}
   /api/auth/register:
     post:
       summary: "Register an account (requires header X-Relay-Client: web)"

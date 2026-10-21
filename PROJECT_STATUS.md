@@ -25,9 +25,11 @@ Status date: 2026-10-21 (frozen release).
 - **Separate Level 2 and Level 3 experiences.** Navigation is grouped by level: Runtime (L1: Systems, Incidents, Recovery history), Codebase (L2: Codebase `/codebase`, Repairs) and Live URL (L3: Live URL `/live-url`). Each page shows its own workflow and only its own runs; a run opened on the wrong page moves to its own level, and old `/assessments?assessment=…` links redirect by kind.
 - **Level 3 evidence view.** The recorded DNS → TCP → TLS → HTTP observations are shown layer by layer with each layer's detail, followed by the HTTP observations (samples, response time, second endpoint, monitoring baseline, content type, security headers) and the sampling pattern. Live URL + Repo shows the repository correlation, keeping *possibly related* apart from *caused by*. Findings are report-only; a runtime recovery links to its Level 1 incident instead of running from Level 3.
 - **Level 2 hand-off.** After Auto-Repair, View Repair Details opens the existing Code Repair Journey (success and failed validation); the approval step links to Apply & Create PR; accounts that may not approve see why.
-- **Notification acknowledgement.** Overview's attention strip, the notification bell and the sidebar Incidents badge share one read state. Opening an incident (or Investigate) acknowledges it everywhere; the incident itself is unchanged; a new incident is notified again.
+- **Notification acknowledgement, per account.** Overview's attention strip, the notification bell and the sidebar Incidents badge share one read state stored by the backend for each user (`incident_acknowledgements`, Flyway V10; `GET/POST /api/notifications/acknowledged`). Opening an incident (or Investigate) acknowledges it on every device; the incident itself is unchanged; a new incident is notified again. Read state kept by the earlier browser-only version is imported once.
+- **Overview by level.** One card per level from stored records (`GET /api/metrics/levels` for Levels 2 and 3): systems healthy, open incidents and verified recoveries; pull requests opened, sandbox-validated and blocked repairs (a PR opened on acknowledged pre-existing test failures is counted separately); live investigations and the latest target. A level that never ran says so.
+- **Incident page and mobile.** Lower-ranked hypotheses and the diagnosis history fold into expandable sections (the top hypothesis stays open; an alternative the AI picked opens itself). Every page fits a 375 px phone without horizontal scrolling.
 - **Truthfulness fixes.** "Currently healthy" counts only systems observed in the last 24 hours (it could exceed "connected"); systems not observed for 24 hours show *Unknown* with the date of their last check; URL monitoring is *Connected* only while a monitored system was checked in the last 24 hours; the GitHub integration describes the approved pull-request flow; the non-existent "Additional telemetry (planned)" connector was removed; the assessment summary omits a "0 auto-repairable" count.
-- **Data.** Monitoring was disabled (not deleted) for three stale registrations: two pointing at the removed `demo-target` host and one Smart Business AI Assistant entry registered at `localhost:3001`, which is unreachable from the backend container. Their history is kept.
+- **Data.** The two Smart Business AI Assistant registrations are named by role (Frontend, Backend). Monitoring was disabled (not deleted) for three stale registrations: two pointing at the removed `demo-target` host and one Smart Business AI Assistant entry registered at `localhost:3001`, which is unreachable from the backend container. Their history is kept.
 
 ## Three operating levels
 
@@ -66,8 +68,8 @@ Status date: 2026-10-21 (frozen release).
 
 | Suite | Result |
 |---|---|
-| Backend (`mvn -B clean test`) | 386 tests, 0 failures, 0 errors |
-| Frontend (`vitest`) | 21 files, 149 tests passed |
+| Backend (`mvn -B clean test`) | 391 tests, 0 failures, 0 errors |
+| Frontend (`vitest`) | 22 files, 154 tests passed |
 | TypeScript (`tsc --noEmit`) | Passed |
 | ESLint | 0 errors, 0 warnings |
 | Production build (`vite build`) | Passed |
@@ -80,5 +82,4 @@ Status date: 2026-10-21 (frozen release).
 - Code repair is limited to the two deterministic strategies; the Dockerfile strategy is covered by automated tests but has not been exercised against a live repository.
 - Sandbox runs can take several minutes for Maven projects (no shared dependency cache by design).
 - Removing a credential literal does not revoke it; rotation stays with the credential's issuer.
-- Notification acknowledgement is stored per browser (the bell's existing read state); it is not shared between users or devices.
 - Level 3 observes one endpoint (plus the origin root) from outside; it cannot see internal health beyond what the endpoint returns.

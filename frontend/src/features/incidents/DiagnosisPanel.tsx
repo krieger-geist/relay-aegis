@@ -42,9 +42,17 @@ function HypothesisCard({ hypothesis, rank, aiSelected }: { hypothesis: Hypothes
 function EngineSection({ engine, aiSelected }: { engine: DeterministicDiagnosis; aiSelected: string | null | undefined }) {
   return <div className="engine-section">
     <div className="evidence-label" style={{ marginTop: 16 }}><Cpu size={12} style={{ verticalAlign: 'middle' }} /> Deterministic hypotheses (ranked)</div>
-    {engine.hypotheses.length ? <ol className="hypothesis-list" aria-label="Deterministic hypotheses">{engine.hypotheses.map((hypothesis, index) =>
-      <HypothesisCard key={hypothesis.patternId} hypothesis={hypothesis} rank={index + 1} aiSelected={aiSelected === hypothesis.patternId} />)}</ol>
-      : <div className="ai-text">No failure pattern matched the collected evidence.</div>}
+    {engine.hypotheses.length ? <>
+      <ol className="hypothesis-list" aria-label="Deterministic hypotheses">
+        <HypothesisCard hypothesis={engine.hypotheses[0]} rank={1} aiSelected={aiSelected === engine.hypotheses[0].patternId} />
+      </ol>
+      {/* Lower-ranked alternatives stay one click away; they open by themselves when the AI picked one of them. */}
+      {engine.hypotheses.length > 1 ? <details className="hypothesis-more" open={engine.hypotheses.slice(1).some((h) => h.patternId === aiSelected)}>
+        <summary>Other ranked hypotheses ({engine.hypotheses.length - 1})</summary>
+        <ol className="hypothesis-list" start={2} aria-label="Lower-ranked hypotheses">{engine.hypotheses.slice(1).map((hypothesis, index) =>
+          <HypothesisCard key={hypothesis.patternId} hypothesis={hypothesis} rank={index + 2} aiSelected={aiSelected === hypothesis.patternId} />)}</ol>
+      </details> : null}
+    </> : <div className="ai-text">No failure pattern matched the collected evidence.</div>}
     <div className="app-meta" style={{ marginTop: 6 }}>Evidence sources: {engine.evidenceSources.length ? engine.evidenceSources.join(', ') : 'none'}</div>
     {engine.unavailableEvidence.length ? <div className="app-meta">Unavailable: {engine.unavailableEvidence.join('; ')}</div> : null}
   </div>;
@@ -104,13 +112,13 @@ export function DiagnosisPanel({ incident, diagnosis, onAnalyse, pending, error 
 
     {diagnosis?.missingEvidence.length ? <><div className="evidence-label" style={{ marginTop: 14 }}>Missing evidence</div>{diagnosis.missingEvidence.map((evidence) => <div className="evidence-line" key={evidence}><Clock3 size={13} /><span>{evidence}</span></div>)}</> : null}
 
-    {diagnosis?.aiAttempts && diagnosis.aiAttempts.length > 1 ? <>
-      <div className="evidence-label" style={{ marginTop: 14 }}>Diagnosis history</div>
+    {diagnosis?.aiAttempts && diagnosis.aiAttempts.length > 1 ? <details className="hypothesis-more">
+      <summary>Diagnosis history ({diagnosis.aiAttempts.length} attempts)</summary>
       <ol className="diagnosis-history" aria-label="Diagnosis history">{diagnosis.aiAttempts.map((attempt, index) => <li className="evidence-line" key={`${attempt.at}-${index}`}>
         {attempt.outcome === 'ai' ? <Sparkles size={13} /> : attempt.outcome === 'deterministic' ? <Cpu size={13} /> : <TriangleAlert size={13} />}
         <span><strong>{attemptLabel(attempt)} · {attemptOutcomeLabel(attempt.outcome)}</strong> — {new Date(attempt.at).toLocaleString()}{attempt.reason ? <> · {attempt.reason}</> : null}</span>
       </li>)}</ol>
-    </> : null}
+    </details> : null}
 
     {diagnosis?.validationNotes.length ? <><div className="evidence-label" style={{ marginTop: 14 }}>Output validation</div>{diagnosis.validationNotes.map((note) => <div className="evidence-line" key={note}><TriangleAlert size={13} /><span>{note}</span></div>)}</> : null}
   </Panel>;

@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { IncidentDetailPage } from '@/features/incidents/IncidentDetailPage';
-import { READ_NOTIFICATIONS_KEY } from '@/lib/incidentNotifications';
+import { fakeAcknowledgements } from '@/test/fakeAcknowledgements';
 import type { Incident } from '@/types/domain';
 import { Sidebar } from './Sidebar';
 
@@ -18,13 +18,13 @@ const incident = (id: string, title: string): Incident => ({
   verification: { status: 'not_run', detail: 'No recovery action has been executed.' }, recoveryDurationMs: null, timeline: [], provenance: 'live', diagnosis: null,
 });
 
-function serve(incidents: Incident[]) {
-  vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+function serve(incidents: Incident[], acknowledgements = fakeAcknowledgements()) {
+  vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
     const path = String(url);
     const one = incidents.find((item) => path.endsWith(`/api/incidents/${item.id}`));
-    const data = path.endsWith('/api/incidents') ? incidents : one ?? (path.endsWith('/resolution-progress')
+    const data = acknowledgements.handle(path, init) ?? (path.endsWith('/api/incidents') ? incidents : one ?? (path.endsWith('/resolution-progress')
       ? { incidentId: 'x', open: true, consecutiveHealthyChecks: 0, requiredHealthyChecks: 2, latestOutcome: 'unreachable', latestCheckAt: null }
-      : { status: 'UP', service: 'relay' });
+      : { status: 'UP', service: 'relay' }));
     return new Response(JSON.stringify({ data, provenance: 'live', updatedAt: '' }), { status: 200 });
   }));
 }
@@ -44,7 +44,8 @@ const badge = () => within(screen.getByRole('link', { name: 'Incidents' })).quer
 describe('Incidents navigation badge', () => {
   it('appears for a new incident, clears when the incident is opened, and stays cleared after navigation and refresh', async () => {
     const first = incident('INC-1', 'Application unreachable');
-    serve([first]);
+    const server = fakeAcknowledgements();
+    serve([first], server);
     renderApp('/');
     expect(await screen.findByLabelText('1 unacknowledged incident')).toHaveTextContent('1');
 
@@ -52,7 +53,7 @@ describe('Incidents navigation badge', () => {
     renderApp('/incidents/INC-1');
     expect(await screen.findByRole('heading', { name: 'Application unreachable' })).toBeInTheDocument();
     await vi.waitFor(() => expect(badge()).toBeNull());
-    expect(JSON.parse(window.localStorage.getItem(READ_NOTIFICATIONS_KEY) ?? '[]')).toEqual(['INC-1']);
+    expect([...server.stored]).toEqual(['INC-1']);
 
     await userEvent.click(screen.getByRole('link', { name: 'Overview' }));
     expect(await screen.findByText('Overview page')).toBeInTheDocument();
@@ -66,8 +67,7 @@ describe('Incidents navigation badge', () => {
   });
 
   it('a genuinely new incident brings the badge back; only acknowledged incidents leave the count', async () => {
-    window.localStorage.setItem(READ_NOTIFICATIONS_KEY, JSON.stringify(['INC-1']));
-    serve([incident('INC-1', 'Application unreachable'), incident('INC-2', 'Database unavailable'), incident('INC-3', 'Network partition')]);
+    serve([incident('INC-1', 'Application unreachable'), incident('INC-2', 'Database unavailable'), incident('INC-3', 'Network partition')], fakeAcknowledgements(['INC-1']));
     renderApp('/');
     expect(await screen.findByLabelText('2 unacknowledged incidents')).toHaveTextContent('2');
 

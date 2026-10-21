@@ -412,3 +412,29 @@ code, pre, .mono { font-family: var(--font-mono); }
 .nav-section-label { display: flex; align-items: center; gap: 7px; margin: 0 0 6px; font-size: 11px; }
 .nav-level { padding: 0 5px; border-radius: 4px; font-family: var(--font-mono); font-size: 10px; letter-spacing: .04em; color: inherit; border: 1px solid currentColor; opacity: .85; }
 .nav-section .nav-list { gap: 2px; }
+/* Overview: one card per operating level */
+.level-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
+.level-card { position: relative; display: grid; grid-template-rows: auto auto 1fr auto; gap: 8px; padding: 16px 18px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-1); box-shadow: var(--shadow-1, none); overflow: hidden; }
+.level-card::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--level-accent); }
+.level-card.level-1 { --level-accent: var(--status-healthy-fg); }
+.level-card.level-2 { --level-accent: var(--brand-600); }
+.level-card.level-3 { --level-accent: var(--status-verifying-fg); }
+.level-card header { display: flex; align-items: center; justify-content: space-between; color: var(--level-accent); }
+.level-card-tag { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; padding: 2px 7px; border-radius: 5px; border: 1px solid currentColor; }
+.level-card h2 { margin: 0; font-family: var(--font-display); font-size: 15px; font-weight: 600; color: var(--text-primary); }
+.level-card-figure { display: grid; gap: 2px; }
+.level-card-figure strong { font-family: var(--font-display); font-size: 30px; line-height: 1.05; font-weight: 600; color: var(--text-primary); }
+.level-card-figure strong small { font-size: 17px; color: var(--text-muted); font-weight: 500; }
+.level-card-figure span { font-size: 12px; color: var(--text-secondary); }
+.level-card ul { list-style: none; margin: 2px 0 0; padding: 0; display: grid; gap: 3px; font-size: 12px; color: var(--text-secondary); min-width: 0; }
+.level-card li { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.level-card li b { color: var(--text-primary); font-weight: 600; }
+.level-card-empty { margin: 0; font-size: 12.5px; color: var(--text-muted); }
+.level-card-link { justify-self: start; display: inline-flex; align-items: center; gap: 5px; margin-top: 4px; font-size: 12px; font-weight: 600; color: var(--level-accent); text-decoration: none; }
+.level-card-link:hover { text-decoration: underline; }
+@media (max-width: 1024px) { .level-cards { grid-template-columns: minmax(0, 1fr); } }
+.hypothesis-more { margin-top: 10px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-2); }
+.hypothesis-more > summary { cursor: pointer; padding: 8px 12px; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.hypothesis-more[open] > summary { border-bottom: 1px solid var(--border); }
+.hypothesis-more > ol { margin: 10px 12px 12px; }
+@media (max-width: 767px) { .panel-header { flex-wrap: wrap; gap: 8px; } .panel-actions { flex-wrap: wrap; } }

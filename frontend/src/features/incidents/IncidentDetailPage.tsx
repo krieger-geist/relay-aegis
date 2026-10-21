@@ -8,7 +8,7 @@ import { StatusBadge } from '@/components/status/StatusBadge';
 import { VerificationOutcome } from '@/components/status/VerificationOutcome';
 import { EmptyState, ErrorState, LoadingState } from '@/components/feedback/States';
 import { apiGet, apiPost } from '@/lib/api/client';
-import { acknowledgeIncidents } from '@/lib/incidentNotifications';
+import { useAcknowledgeIncidents } from '@/lib/incidentNotifications';
 import { recoveryRecords } from '@/lib/diagnosisEngine';
 import { recommendedNextStep } from '@/lib/incidentGuidance';
 import { resolutionNotice } from '@/lib/resolutionProgress';
@@ -23,9 +23,10 @@ export function IncidentDetailPage() {
   const progress = useQuery({ queryKey: ['incident-resolution', id], queryFn: () => apiGet<ResolutionProgress>(`/api/incidents/${id}/resolution-progress`), enabled: progressEnabled, refetchInterval: progressEnabled ? 10000 : false, retry: false });
   const recover = useMutation({ mutationFn: () => apiPost<Incident>(`/api/incidents/${id}/recover`), onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['incident', id] }); await queryClient.invalidateQueries({ queryKey: ['incidents'] }); await queryClient.invalidateQueries({ queryKey: ['summary'] }); await queryClient.invalidateQueries({ queryKey: ['recovery-history'] }); } });
   const diagnose = useMutation({ mutationFn: () => apiPost<Diagnosis>(`/api/incidents/${id}/diagnose`), onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['incident', id] }); await queryClient.invalidateQueries({ queryKey: ['incidents'] }); } });
+  const acknowledgeIncidents = useAcknowledgeIncidents();
   const loadedId = incident.data?.data.id;
   // Viewing an incident acknowledges its notification (Overview, bell, sidebar). The incident itself is not changed.
-  useEffect(() => { if (loadedId) acknowledgeIncidents([loadedId]); }, [loadedId]);
+  useEffect(() => { if (loadedId) acknowledgeIncidents([loadedId]); }, [loadedId, acknowledgeIncidents]);
   if (incident.isLoading) return <LoadingState label="Loading incident" />;
   if (incident.isError || !incident.data) return <ErrorState title="Incident unavailable" detail={incident.error?.message ?? 'The incident could not be retrieved.'} onRetry={() => void incident.refetch()} />;
   const item = incident.data.data;

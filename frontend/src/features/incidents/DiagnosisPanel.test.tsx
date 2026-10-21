@@ -84,8 +84,12 @@ describe('DiagnosisPanel', () => {
     expect(list).toHaveTextContent('#1Container stopped');
     expect(list).toHaveTextContent('92% · High');
     expect(list).toHaveTextContent('status=exited exitCode=0');
-    expect(list).toHaveTextContent('Contradicts: [health_check] later check healthy');
-    expect(list).toHaveTextContent('Missing: listener state');
+    const lower = screen.getByRole('list', { name: 'Lower-ranked hypotheses' });
+    expect(lower).toHaveTextContent('#2Connection refused');
+    expect(lower).toHaveTextContent('Contradicts: [health_check] later check healthy');
+    expect(lower).toHaveTextContent('Missing: listener state');
+    expect(lower.closest('details')).not.toHaveAttribute('open');
+    expect(screen.getByText('Other ranked hypotheses (1)')).toBeInTheDocument();
     expect(screen.getByText(/Unavailable: container logs/)).toBeInTheDocument();
   });
 

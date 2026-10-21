@@ -19,7 +19,7 @@ Nothing is marked *resolved* because an action ran. A runtime repair is resolved
 | **2 · Codebase self-healing** | Codebase → Codebase (`/codebase`), Repairs | Repository analysis | Repository → Findings → Diagnosis → Repair → Sandbox Validation → Security Re-scan → Human Approval → Branch → Commit → Pull Request → Human Merge |
 | **3 · Live URL investigation** | Live URL → Live URL (`/live-url`): *Live URL* or *Live URL + Repo* | URL → DNS → TCP → TLS → HTTP → Evidence → Diagnosis | A structured report; never a code change. A repository adds evidence; a relationship is "possibly related", never "caused by". |
 
-Level 2 and Level 3 are separate pages on one assessment engine: the Codebase page never shows live URL controls, and the Live URL page never shows Auto-Repair, Apply or any GitHub repair control.
+Level 2 and Level 3 are separate pages on one assessment engine: the Codebase page never shows live URL controls, and the Live URL page never shows Auto-Repair, Apply or any GitHub repair control. The Overview shows one card per level, built only from recorded runs; incident notifications (attention strip, bell, sidebar badge) are acknowledged per account and never change the incident.
 
 ## What it does
 
