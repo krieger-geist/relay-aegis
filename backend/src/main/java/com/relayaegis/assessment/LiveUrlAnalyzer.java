@@ -45,15 +45,23 @@ public class LiveUrlAnalyzer {
         this.healthChecks = healthChecks;
     }
 
-    public record UrlScanResult(List<AssessmentFindingDto> findings, List<AssessmentCheckDto> checks) {}
+    /** {@code observation} is the structured record used for timing and change comparison; null only for older callers. */
+    public record UrlScanResult(List<AssessmentFindingDto> findings, List<AssessmentCheckDto> checks, LiveObservation observation) {
+        public UrlScanResult(List<AssessmentFindingDto> findings, List<AssessmentCheckDto> checks) { this(findings, checks, null); }
+    }
+
+    /** The body is read only to time its download, capped and discarded; it is never stored or inspected. */
+    static final int MAX_BODY_BYTES = 256 * 1024;
 
     public UrlScanResult scan(String target) {
         URI uri = targetPolicy.validate(target);
         List<AssessmentFindingDto> findings = new ArrayList<>();
         List<AssessmentCheckDto> checks = new ArrayList<>();
+        LiveObservation.Builder obs = new LiveObservation.Builder(uri);
 
         // ---- DNS / TCP / TLS -------------------------------------------------------------------------------------
         UrlNetworkProbe.Observation net = probe.observe(uri, Duration.ofSeconds(4), address -> targetPolicy.isPermittedAddress(uri.getHost(), address));
+        obs.network(net);
         if (!net.dnsResolved()) {
             checks.add(new AssessmentCheckDto("DNS resolution", "failed", "The host name " + net.host() + " did not resolve (" + net.dnsError() + ")."));
             add(findings, "network", "Host name does not resolve", "high", "high", OBSERVED,
@@ -61,13 +69,13 @@ public class LiveUrlAnalyzer {
                     "Without an address no connection is possible. This is observed from the assessment host only; resolvers elsewhere may differ.",
                     "Verify the DNS records for the host and the resolver used by the assessment host.");
             skipped(checks, "TCP connect", "TLS handshake", "HTTP request");
-            return new UrlScanResult(findings, checks);
+            return new UrlScanResult(findings, checks, obs.build(checks));
         }
         checks.add(new AssessmentCheckDto("DNS resolution", "passed", "Resolved to " + net.addresses().size() + " address(es) in " + net.dnsMs() + " ms."));
         if ("blocked".equals(net.tcp())) {
             checks.add(new AssessmentCheckDto("TCP connect", "failed", "No resolved address is permitted for assessment (private or reserved range)."));
             skipped(checks, "TLS handshake", "HTTP request");
-            return new UrlScanResult(findings, checks);
+            return new UrlScanResult(findings, checks, obs.build(checks));
         }
         if (!net.tcp().equals("connected")) {
             String what = switch (net.tcp()) { case "refused" -> "was refused"; case "timeout" -> "timed out"; default -> "failed (" + net.tlsDetail() + ")"; };
@@ -78,7 +86,7 @@ public class LiveUrlAnalyzer {
                             : "No TCP connection was established; a firewall, routing problem or overloaded host could explain it.",
                     "Check that the service listens on this port and that the network path from the assessment host is open.");
             skipped(checks, "TLS handshake", "HTTP request");
-            return new UrlScanResult(findings, checks);
+            return new UrlScanResult(findings, checks, obs.build(checks));
         }
         checks.add(new AssessmentCheckDto("TCP connect", "passed", "Connected to port " + net.port() + " in " + net.tcpMs() + " ms."));
         if ("https".equalsIgnoreCase(uri.getScheme())) {
@@ -89,7 +97,7 @@ public class LiveUrlAnalyzer {
                         "Clients that validate certificates cannot connect securely.",
                         "Install a valid certificate for the host name and check the TLS configuration.");
                 skipped(checks, "HTTP request");
-                return new UrlScanResult(findings, checks);
+                return new UrlScanResult(findings, checks, obs.build(checks));
             }
             long daysLeft = net.certNotAfter() == null ? -1 : Duration.between(Instant.now(), net.certNotAfter()).toDays();
             checks.add(new AssessmentCheckDto("TLS handshake", "passed", net.tlsProtocol() + " with " + net.tlsCipher()
@@ -120,12 +128,17 @@ public class LiveUrlAnalyzer {
             long start = System.nanoTime();
             try {
                 HttpResponse<InputStream> response = get(uri);
-                response.body().close();
-                latencies.add(Math.max(1, Duration.ofNanos(System.nanoTime() - start).toMillis()));
+                long ttfb = Math.max(1, Duration.ofNanos(System.nanoTime() - start).toMillis());
+                long readStart = System.nanoTime();
+                long[] read = drain(response.body());
+                obs.samples.add(new LiveObservation.Sample(i + 1, response.statusCode(), ttfb,
+                        Duration.ofNanos(System.nanoTime() - readStart).toMillis(), read[0], read[1] == 1, null));
+                latencies.add(ttfb);
                 samples.add(String.valueOf(response.statusCode()));
                 if (first == null) { first = response; statusCode = response.statusCode(); }
             } catch (Exception ex) {
                 failure = safeFailure(ex);
+                obs.samples.add(new LiveObservation.Sample(i + 1, null, null, null, null, false, failure));
                 samples.add("no-response");
                 if (first == null) break;
             }
@@ -137,7 +150,7 @@ public class LiveUrlAnalyzer {
                     "TCP connected, but the HTTP GET failed: " + failure,
                     "The server accepted the connection but did not complete an HTTP response within the deadline. The internal cause is not observable from outside.",
                     "Correlate the timestamp with the application's own logs.");
-            return new UrlScanResult(findings, checks);
+            return new UrlScanResult(findings, checks, obs.build(checks));
         }
         checks.add(new AssessmentCheckDto("HTTP reachability", statusCode < 500 ? "passed" : "failed",
                 "Target responded with HTTP " + statusCode + " to " + latencies.size() + " GET request(s). No redirect was followed."));
@@ -160,10 +173,11 @@ public class LiveUrlAnalyzer {
         if (median > 2000) add(findings, "performance", "Slow responses", "low", "medium", OBSERVED,
                 "Median time to response headers was " + median + " ms over " + latencies.size() + " samples.",
                 "A few samples are not a load test, but consistent slowness affects users.", "Compare with the service's latency objective over a longer period.");
-        secondEndpoint(uri, checks);
+        if (statusCode >= 300 && statusCode < 400) obs.redirectLocation = first.headers().firstValue("location").map(LiveUrlAnalyzer::withoutQuery).orElse(null);
+        secondEndpoint(uri, checks, obs);
         historicalComparison(uri, median, statusCode, checks, findings);
-        responseCharacteristics(uri, first, checks, findings);
-        return new UrlScanResult(findings, checks);
+        responseCharacteristics(uri, first, checks, findings, obs);
+        return new UrlScanResult(findings, checks, obs.build(checks));
     }
 
     /** Per-sample outcomes of the repeated GET (status code or "no-response"), used to tell persistent from intermittent failures. */
@@ -173,13 +187,14 @@ public class LiveUrlAnalyzer {
         return new AssessmentCheckDto(SAMPLES_CHECK, status, ok + " of " + samples.size() + " sample(s) succeeded; outcomes: " + String.join(", ", samples) + ".");
     }
 
-    private void secondEndpoint(URI uri, List<AssessmentCheckDto> checks) {
+    private void secondEndpoint(URI uri, List<AssessmentCheckDto> checks, LiveObservation.Builder obs) {
         String path = uri.getRawPath() == null ? "" : uri.getRawPath();
         if (path.isEmpty() || path.equals("/")) return;
         URI root = URI.create(uri.getScheme() + "://" + uri.getRawAuthority() + "/");
         try {
             HttpResponse<InputStream> response = get(root);
             response.body().close();
+            obs.rootStatus = response.statusCode();
             checks.add(new AssessmentCheckDto("Second endpoint (origin root)", response.statusCode() < 500 ? "passed" : "warning",
                     "GET / returned HTTP " + response.statusCode() + " (same host; not followed further)."));
         } catch (Exception ex) {
@@ -229,8 +244,12 @@ public class LiveUrlAnalyzer {
     private static int port(URI uri) { return uri.getPort() != -1 ? uri.getPort() : "https".equalsIgnoreCase(uri.getScheme()) ? 443 : 80; }
     private static String normalizePath(String path) { return path == null || path.isEmpty() ? "/" : path.replaceAll("/+$", "").isEmpty() ? "/" : path.replaceAll("/+$", ""); }
 
-    private void responseCharacteristics(URI uri, HttpResponse<?> response, List<AssessmentCheckDto> checks, List<AssessmentFindingDto> findings) {
+    private void responseCharacteristics(URI uri, HttpResponse<?> response, List<AssessmentCheckDto> checks, List<AssessmentFindingDto> findings,
+                                         LiveObservation.Builder obs) {
         var contentType = response.headers().firstValue("content-type");
+        obs.contentType = contentType.map(LiveUrlAnalyzer::safeHeader).orElse(null);
+        obs.server = response.headers().firstValue("server").map(LiveUrlAnalyzer::safeHeader).orElse(null);
+        LiveObservation.TRACKED_HEADERS.forEach(name -> { if (response.headers().firstValue(name).isPresent()) obs.headers.add(name); });
         checks.add(new AssessmentCheckDto("Content type", contentType.isPresent() ? "passed" : "warning", "Response Content-Type: " + safeHeader(contentType.orElse("not provided")) + "."));
         checkHeader(response, findings, "content-security-policy", "Content Security Policy header is missing", "low",
                 "A CSP can reduce the impact of some browser injection classes. Its absence is a hardening signal, not proof of an exploitable issue.",
@@ -263,6 +282,24 @@ public class LiveUrlAnalyzer {
         }
         checks.add(new AssessmentCheckDto("Security headers", findings.stream().anyMatch(f -> f.category().equals("security-header") || f.category().equals("transport")) ? "warning" : "passed",
                 "Checked a small set of common response headers and cookie attributes only; this is not a full security assessment."));
+    }
+
+    /** Reads at most {@link #MAX_BODY_BYTES} only to time the download, then closes; returns {bytes read, 1 if capped}. */
+    static long[] drain(InputStream body) throws java.io.IOException {
+        try (body) {
+            byte[] buffer = new byte[8192];
+            long total = 0;
+            int n;
+            while (total < MAX_BODY_BYTES && (n = body.read(buffer, 0, (int) Math.min(buffer.length, MAX_BODY_BYTES - total))) != -1) total += n;
+            return new long[] {total, total >= MAX_BODY_BYTES ? 1 : 0};
+        }
+    }
+
+    /** Redirect targets are recorded without their query string, which may carry tokens. */
+    static String withoutQuery(String location) {
+        int cut = location.indexOf('?');
+        String bare = cut < 0 ? location : location.substring(0, cut);
+        return safeHeader(bare);
     }
 
     private HttpResponse<InputStream> get(URI uri) throws Exception {

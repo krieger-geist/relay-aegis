@@ -284,6 +284,17 @@ export interface DashboardSummary {
 }
 
 export type AssessmentKind = 'repository' | 'url' | 'combined';
+/** Structured record of one Live URL run (metadata only; never a response body). */
+export interface LiveSample { index: number; status: number | null; ttfbMs: number | null; downloadMs: number | null; bytes: number | null; truncated: boolean; failure: string | null }
+export interface LiveObservation {
+  version: number; url: string; observedAt: string; addresses: string[]; dnsMs: number | null; tcpMs: number | null; tlsMs: number | null;
+  tlsProtocol: string | null; tlsCipher: string | null; certNotAfter: string | null; certIssuer: string | null;
+  layers: Record<string, 'PASSED' | 'FAILED' | 'NOT_TESTED' | 'NOT_APPLICABLE'>; samples: LiveSample[];
+  redirectLocation: string | null; server: string | null; contentType: string | null; headers: string[]; rootStatus: number | null;
+}
+export interface LiveChange { aspect: string; before: string; after: string; significance: 'notable' | 'minor'; note: string | null }
+/** GET /api/assessments/{id}/live: the run's observation and what changed since the previous run of the same URL. */
+export interface LiveInsight { observation: LiveObservation | null; comparison: 'COMPARED' | 'FIRST_RUN' | 'NOT_RECORDED'; previousId: string | null; previousAt: string | null; changes: LiveChange[] }
 /** GET /api/assessments/target-policy: which live URL targets may be investigated. */
 export interface TargetPolicy { allowPublicHosts: boolean; allowedHosts: string[] }
 export type AssessmentRunStatus = 'queued' | 'running' | 'completed' | 'failed';

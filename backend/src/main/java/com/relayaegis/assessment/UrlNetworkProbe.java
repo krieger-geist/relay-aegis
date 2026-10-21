@@ -29,7 +29,7 @@ public class UrlNetworkProbe {
 
     public record Observation(String host, int port, boolean dnsResolved, String dnsError, List<String> addresses, long dnsMs,
                               String tcp, Long tcpMs, String tls, String tlsProtocol, String tlsCipher, Instant certNotAfter,
-                              String tlsDetail, Instant observedAt) {}
+                              String tlsDetail, Instant observedAt, Long tlsMs, String certIssuer) {}
 
     public Observation observe(URI uri, Duration timeout, Predicate<InetAddress> addressAllowed) {
         String host = uri.getHost();
@@ -41,30 +41,30 @@ public class UrlNetworkProbe {
         try {
             addresses = InetAddress.getAllByName(host);
         } catch (UnknownHostException ex) {
-            return new Observation(host, port, false, "host not found", List.of(), elapsed(started), "skipped", null, null, null, null, null, null, Instant.now());
+            return new Observation(host, port, false, "host not found", List.of(), elapsed(started), "skipped", null, null, null, null, null, null, Instant.now(), null, null);
         } catch (Exception ex) {
-            return new Observation(host, port, false, ex.getClass().getSimpleName(), List.of(), elapsed(started), "skipped", null, null, null, null, null, null, Instant.now());
+            return new Observation(host, port, false, ex.getClass().getSimpleName(), List.of(), elapsed(started), "skipped", null, null, null, null, null, null, Instant.now(), null, null);
         }
         long dnsMs = elapsed(started);
         List<String> rendered = java.util.Arrays.stream(addresses).map(InetAddress::getHostAddress).limit(8).toList();
         InetAddress target = java.util.Arrays.stream(addresses).filter(addressAllowed).findFirst().orElse(null);
         if (target == null) {
             return new Observation(host, port, true, null, rendered, dnsMs, "blocked", null, null, null, null, null,
-                    "No resolved address is permitted for probing.", Instant.now());
+                    "No resolved address is permitted for probing.", Instant.now(), null, null);
         }
         long tcpStarted = System.nanoTime();
         try (Socket socket = new Socket()) {
             socket.connect(new InetSocketAddress(target, port), timeoutMs);
             long tcpMs = elapsed(tcpStarted);
-            if (!https) return new Observation(host, port, true, null, rendered, dnsMs, "connected", tcpMs, null, null, null, null, null, Instant.now());
+            if (!https) return new Observation(host, port, true, null, rendered, dnsMs, "connected", tcpMs, null, null, null, null, null, Instant.now(), null, null);
             return tls(socket, host, port, timeoutMs, rendered, dnsMs, tcpMs);
         } catch (SocketTimeoutException ex) {
-            return new Observation(host, port, true, null, rendered, dnsMs, "timeout", elapsed(tcpStarted), null, null, null, null, null, Instant.now());
+            return new Observation(host, port, true, null, rendered, dnsMs, "timeout", elapsed(tcpStarted), null, null, null, null, null, Instant.now(), null, null);
         } catch (java.net.ConnectException ex) {
-            return new Observation(host, port, true, null, rendered, dnsMs, "refused", elapsed(tcpStarted), null, null, null, null, null, Instant.now());
+            return new Observation(host, port, true, null, rendered, dnsMs, "refused", elapsed(tcpStarted), null, null, null, null, null, Instant.now(), null, null);
         } catch (Exception ex) {
             return new Observation(host, port, true, null, rendered, dnsMs, "error", elapsed(tcpStarted), null, null, null, null,
-                    ex.getClass().getSimpleName(), Instant.now());
+                    ex.getClass().getSimpleName(), Instant.now(), null, null);
         }
     }
 
@@ -76,17 +76,35 @@ public class UrlNetworkProbe {
             parameters.setEndpointIdentificationAlgorithm("HTTPS");
             try { parameters.setServerNames(List.of(new SNIHostName(host))); } catch (IllegalArgumentException ignored) { /* IP literal */ }
             ssl.setSSLParameters(parameters);
+            long tlsStarted = System.nanoTime();
             ssl.startHandshake();
+            long tlsMs = elapsed(tlsStarted);
             Instant notAfter = null;
+            String issuer = null;
             Certificate[] chain = ssl.getSession().getPeerCertificates();
-            if (chain.length > 0 && chain[0] instanceof X509Certificate x509) notAfter = x509.getNotAfter().toInstant();
+            if (chain.length > 0 && chain[0] instanceof X509Certificate x509) {
+                notAfter = x509.getNotAfter().toInstant();
+                issuer = issuerName(x509);
+            }
             String protocol = ssl.getSession().getProtocol();
             String cipher = ssl.getSession().getCipherSuite();
             ssl.close();
-            return new Observation(host, port, true, null, addresses, dnsMs, "connected", tcpMs, "ok", protocol, cipher, notAfter, null, Instant.now());
+            return new Observation(host, port, true, null, addresses, dnsMs, "connected", tcpMs, "ok", protocol, cipher, notAfter, null, Instant.now(), tlsMs, issuer);
         } catch (Exception ex) {
-            return new Observation(host, port, true, null, addresses, dnsMs, "connected", tcpMs, "failed", null, null, null, classifyTls(ex), Instant.now());
+            return new Observation(host, port, true, null, addresses, dnsMs, "connected", tcpMs, "failed", null, null, null, classifyTls(ex), Instant.now(), null, null);
         }
+    }
+
+    /** The issuer's organisation (or common name) only, e.g. "Let's Encrypt"; never the full distinguished name. */
+    static String issuerName(X509Certificate certificate) {
+        String dn = certificate.getIssuerX500Principal().getName();
+        for (String key : new String[] {"O=", "CN="}) {
+            for (String part : dn.split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)")) {
+                String trimmed = part.trim();
+                if (trimmed.startsWith(key)) return trimmed.substring(key.length()).replace("\\", "").replace("\"", "").trim();
+            }
+        }
+        return null;
     }
 
     static String classifyTls(Throwable ex) {

@@ -9,10 +9,11 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { Panel } from '@/components/common/Panel';
 import { LoadingState, ErrorState, EmptyState } from '@/components/feedback/States';
 import { apiGet, apiPost } from '@/lib/api/client';
-import type { Assessment, AssessmentCheck, TargetPolicy, AssessmentFinding, AssessmentKind, AssessmentReport, AssessmentTimelineStep, CreateAssessmentRequest, RepairJob } from '@/types/domain';
+import type { Assessment, AssessmentCheck, LiveInsight, TargetPolicy, AssessmentFinding, AssessmentKind, AssessmentReport, AssessmentTimelineStep, CreateAssessmentRequest, RepairJob } from '@/types/domain';
 import '@/styles/assessment.css';
 import { DiagnosisSummary, FindingGroups, VerificationSummary } from './AssessmentDiagnosis';
 import { LiveEvidencePath, RepositoryCorrelation } from './LiveEvidence';
+import { LiveChanges, TimingBreakdown } from './LiveInsight';
 import { LEVELS, investigationPath, levelOf, type InvestigationLevel } from './levels';
 import { findingsOf } from './repairStates';
 
@@ -88,6 +89,11 @@ export function AssessmentsPage({ level }: { level: InvestigationLevel }) {
   const targetPolicy = useQuery({ queryKey: ['assessment-target-policy'], queryFn: () => apiGet<TargetPolicy>('/api/assessments/target-policy'), enabled: level === 3, staleTime: 60000, retry: false });
   const policy = targetPolicy.data?.data;
   const hostHint = !policy ? 'Host must be permitted' : policy.allowPublicHosts ? 'Any public website · standard port' : `Allowed: ${policy.allowedHosts.join(', ')}`;
+  const liveInsight = useQuery({
+    queryKey: ['live-insight', selected?.id], queryFn: () => apiGet<LiveInsight>(`/api/assessments/${encodeURIComponent(selected?.id ?? '')}/live`),
+    enabled: level === 3 && selected?.status === 'completed', retry: false,
+  });
+  const insight = liveInsight.data?.data;
   const reportQuery = useMutation({ mutationFn: (id: string) => apiGet<AssessmentReport>(`/api/assessments/${id}/report`) });
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -221,7 +227,13 @@ export function AssessmentsPage({ level }: { level: InvestigationLevel }) {
       {selected.status === 'completed' ? <>
         {selected.diagnosis && level === 3 ? <>
           <DiagnosisSummary diagnosis={selected.diagnosis} />
+          <Panel title="What changed since the last run" subtitle="Differences between this run and the previous run of the same URL" provenance={selected.provenance}>
+            {insight ? <LiveChanges insight={insight} /> : <p className="live-empty">{liveInsight.isError ? 'The comparison could not be loaded.' : 'Comparing with the previous run…'}</p>}
+          </Panel>
           <Panel title="Evidence" subtitle="What RELAY observed, layer by layer" provenance={selected.provenance}><LiveEvidencePath assessment={selected} /></Panel>
+          <Panel title="Where the time goes" subtitle="Connection setup, waiting for the server and downloading, per request" provenance={selected.provenance}>
+            {insight?.observation ? <TimingBreakdown observation={insight.observation} /> : <p className="live-empty">{insight ? 'This run predates timing capture; run the URL again to see the breakdown.' : liveInsight.isError ? 'Timing could not be loaded.' : 'Loading timing…'}</p>}
+          </Panel>
           {selected.kind === 'combined' ? <Panel title="Repository correlation" subtitle="How the repository relates to the live evidence"><RepositoryCorrelation diagnosis={selected.diagnosis} /></Panel> : null}
           {findingsOf(selected.diagnosis, 'AUTO_REPAIRABLE').length + findingsOf(selected.diagnosis, 'ACTION_REQUIRED').length ? <Panel title={`Findings requiring action (${findingsOf(selected.diagnosis, 'AUTO_REPAIRABLE').length + findingsOf(selected.diagnosis, 'ACTION_REQUIRED').length})`} subtitle="Report only · ranked by impact, evidence strength and confidence" provenance={selected.provenance}>
             <FindingGroups diagnosis={selected.diagnosis} assessmentId={selected.id} originals={selected.findings} only={['AUTO_REPAIRABLE', 'ACTION_REQUIRED']} reportOnly />

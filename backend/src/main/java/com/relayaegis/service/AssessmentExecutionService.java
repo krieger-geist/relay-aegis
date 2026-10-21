@@ -85,10 +85,11 @@ public class AssessmentExecutionService {
 
             if ("url".equals(assessment.getKind()) || "combined".equals(assessment.getKind())) {
                 startStage(assessment, timeline, "live_url_check", "Checking live application",
-                        "Making one allowlisted HTTP GET request. Redirects are not followed and the response body is not retained.");
+                        "Checking DNS, TCP and TLS, then a few bounded GET requests. Redirects are not followed and response bodies are not retained.");
                 LiveUrlAnalyzer.UrlScanResult urlResult = urlAnalyzer.scan(assessment.getApplicationUrl());
                 findings.addAll(urlResult.findings());
                 checks.addAll(urlResult.checks());
+                if (urlResult.observation() != null) assessment.setLiveObservationJson(mapper.writeValueAsString(urlResult.observation()));
                 completeCurrentStage(assessment, timeline, "The bounded URL check completed with "
                         + urlResult.findings().size() + " candidate finding(s); no request body was stored.");
             }

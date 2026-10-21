@@ -55,6 +55,10 @@ public class AssessmentEntity {
     @Column(name = "ai_triage_requested", nullable = false)
     private boolean aiTriageRequested;
 
+    /** Live URL runs only: the structured observation used for timing and change comparison (metadata, never a body). */
+    @Column(name = "live_observation_json", columnDefinition = "TEXT")
+    private String liveObservationJson;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -97,6 +101,8 @@ public class AssessmentEntity {
     public void setErrorMessage(String errorMessage) { this.errorMessage = errorMessage; }
     public boolean isAiTriageRequested() { return aiTriageRequested; }
     public void setAiTriageRequested(boolean aiTriageRequested) { this.aiTriageRequested = aiTriageRequested; }
+    public String getLiveObservationJson() { return liveObservationJson; }
+    public void setLiveObservationJson(String liveObservationJson) { this.liveObservationJson = liveObservationJson; }
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
     public Instant getStartedAt() { return startedAt; }

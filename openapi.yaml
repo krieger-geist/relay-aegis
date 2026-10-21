@@ -24,6 +24,16 @@ paths:
       responses:
         '200': {description: OK}
         '401': {description: Missing or invalid access token}
+  /api/assessments/{id}/live:
+    get:
+      summary: Live URL run timing breakdown and what changed since the previous run of the same URL (report only)
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200': {description: "observation, comparison (COMPARED, FIRST_RUN or NOT_RECORDED), previousId, previousAt, changes"}
+        '400': {description: Not a Live URL investigation}
+        '401': {description: Missing or invalid access token}
+        '404': {description: Unknown assessment}
   /api/assessments/target-policy:
     get:
       summary: Which live URL targets may be investigated (configured hosts, and whether any public host is allowed)

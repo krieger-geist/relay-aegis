@@ -22,10 +22,12 @@ public class AssessmentController {
     private final AssessmentService assessments;
     private final com.relayaegis.repair.RepairOrchestrator repairs;
     private final com.relayaegis.assessment.AssessmentTargetPolicy targets;
+    private final com.relayaegis.service.LiveInsightService liveInsight;
     public record TargetPolicyDto(boolean allowPublicHosts, java.util.List<String> allowedHosts) {}
     public AssessmentController(AssessmentService assessments, com.relayaegis.repair.RepairOrchestrator repairs,
-                                com.relayaegis.assessment.AssessmentTargetPolicy targets) {
+                                com.relayaegis.assessment.AssessmentTargetPolicy targets, com.relayaegis.service.LiveInsightService liveInsight) {
         this.targets = targets;
+        this.liveInsight = liveInsight;
         this.assessments = assessments; this.repairs = repairs;
     }
 
@@ -40,6 +42,12 @@ public class AssessmentController {
     @GetMapping("/{id}/findings/{findingId}/auto-repair")
     public ApiEnvelope<com.relayaegis.dto.FindingDtos.RepairProgressDto> repairProgress(@PathVariable String id, @PathVariable String findingId) {
         return ApiEnvelope.of(repairs.progress(com.relayaegis.repair.RepairStrategy.Target.finding(id, findingId)), "live");
+    }
+
+    /** Live URL runs: the request timing breakdown and what changed since the previous run of the same URL. */
+    @GetMapping("/{id}/live")
+    public ApiEnvelope<com.relayaegis.service.LiveInsightService.LiveInsightDto> live(@PathVariable String id) {
+        return ApiEnvelope.of(liveInsight.insight(id), "live");
     }
 
     /** Which live URL targets may be investigated: the configured hosts, and whether any public host is allowed. */

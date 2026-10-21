@@ -30,6 +30,7 @@ Status date: 2026-10-21 (frozen release).
 - **Overview by level.** One card per level from stored records (`GET /api/metrics/levels` for Levels 2 and 3): systems healthy, open incidents and verified recoveries; pull requests opened, sandbox-validated and blocked repairs (a PR opened on acknowledged pre-existing test failures is counted separately); live investigations and the latest target. A level that never ran says so.
 - **Incident page and mobile.** Lower-ranked hypotheses and the diagnosis history fold into expandable sections (the top hypothesis stays open; an alternative the AI picked opens itself). Every page fits a 375 px phone without horizontal scrolling.
 - **Truthfulness fixes.** "Currently healthy" counts only systems observed in the last 24 hours (it could exceed "connected"); systems not observed for 24 hours show *Unknown* with the date of their last check; URL monitoring is *Connected* only while a monitored system was checked in the last 24 hours; the GitHub integration describes the approved pull-request flow; the non-existent "Additional telemetry (planned)" connector was removed; the assessment summary omits a "0 auto-repairable" count.
+- **Live URL: what changed and where the time goes.** Each Live URL run stores a structured observation (Flyway V11 `live_observation_json`: per-layer result, DNS/TCP/TLS timing, per-request time to first byte and download time, TLS protocol, certificate issuer and expiry, tracked security-header presence, redirect target without query, server and content type; never a body). `GET /api/assessments/{id}/live` returns it with the comparison to the previous completed run of the same endpoint: a change is reported only as a difference between two recorded values; latency counts only when it moves by both 1.5x and 100 ms. Runs recorded before this release are reported as not comparable. Verified live: example.com twice (compared, no change) and github.com twice (median first byte 619 → 233 ms, flagged). Code and Runtime are unchanged.
 - **Any public website (opt-in).** `RELAY_ASSESSMENT_ALLOW_PUBLIC_HOSTS=true` lets Live URL investigate any host that resolves only to public addresses; off by default. The host is re-resolved and checked before every HTTP request, closing a DNS-rebinding gap where the HTTP client resolved the name separately from the TCP/TLS probe. The form shows the active policy (`GET /api/assessments/target-policy`), and the scope note now says a few bounded GETs are made (it previously claimed one).
 - **Data.** The two Smart Business AI Assistant registrations are named by role (Frontend, Backend). Monitoring was disabled (not deleted) for three stale registrations: two pointing at the removed `demo-target` host and one Smart Business AI Assistant entry registered at `localhost:3001`, which is unreachable from the backend container. Their history is kept.
 
@@ -70,8 +71,8 @@ Status date: 2026-10-21 (frozen release).
 
 | Suite | Result |
 |---|---|
-| Backend (`mvn -B clean test`) | 391 tests, 0 failures, 0 errors |
-| Frontend (`vitest`) | 22 files, 154 tests passed |
+| Backend (`mvn -B clean test`) | 405 tests, 0 failures, 0 errors |
+| Frontend (`vitest`) | 23 files, 161 tests passed |
 | TypeScript (`tsc --noEmit`) | Passed |
 | ESLint | 0 errors, 0 warnings |
 | Production build (`vite build`) | Passed |

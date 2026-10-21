@@ -173,4 +173,33 @@ class LiveUrlDiagnosisTest {
         assertFalse(LiveUrlAnalyzer.sameEndpoint("http://test-target:8081/health", uri));
         assertFalse(LiveUrlAnalyzer.sameEndpoint("http://test-target:8080/", uri));
     }
+
+    @Test
+    void recordsAStructuredObservationWithPerRequestTimingButNoBody() {
+        LiveUrlAnalyzer.UrlScanResult result = analyzer.scan("http://127.0.0.1:" + port + "/health");
+        LiveObservation observation = result.observation();
+        assertEquals("PASSED", observation.layers().get("DNS"));
+        assertEquals("PASSED", observation.layers().get("TCP"));
+        assertEquals("NOT_APPLICABLE", observation.layers().get("TLS"));
+        assertEquals("PASSED", observation.layers().get("HTTP"));
+        assertEquals(LiveUrlAnalyzer.LATENCY_SAMPLES, observation.samples().size());
+        observation.samples().forEach(sample -> {
+            assertEquals(200, sample.status());
+            assertTrue(sample.ttfbMs() >= 1);
+            assertEquals("{\"status\":\"ok\"}".length(), sample.bytes());
+        });
+        assertEquals("nginx/1.25.3", observation.server());
+        assertEquals(200, observation.rootStatus());
+        assertTrue(observation.tcpMs() != null && observation.dnsMs() != null);
+        assertTrue(observation.headers().isEmpty());
+    }
+
+    @Test
+    void anUnresolvableHostRecordsOnlyTheFailedDnsLayer() {
+        LiveObservation observation = analyzer.scan("http://relay-nonexistent.invalid/health").observation();
+        assertEquals("FAILED", observation.layers().get("DNS"));
+        assertEquals("NOT_TESTED", observation.layers().get("TCP"));
+        assertEquals("NOT_TESTED", observation.layers().get("HTTP"));
+        assertTrue(observation.samples().isEmpty());
+    }
 }
