@@ -11,15 +11,17 @@ Nothing is marked *resolved* because an action ran. A runtime repair is resolved
 
 ---
 
-## Three operating levels, one engine
+## Three boundaries, one engine
 
-| Level | In the app | Evidence | Action |
+RELAY works within three evidence boundaries. They are separate, not ranked: each one decides what RELAY may observe and what it may change.
+
+| Boundary | In the app | Evidence | Action |
 |---|---|---|---|
-| **1 · Runtime self-healing** | Runtime → Systems, Incidents, Recovery history | Health, containers, logs, dependencies | Allowlisted, policy-checked runtime recovery, then verification. No source changes. |
-| **2 · Codebase self-healing** | Codebase → Codebase (`/codebase`), Repairs | Repository analysis | Repository → Findings → Diagnosis → Repair → Sandbox Validation → Security Re-scan → Human Approval → Branch → Commit → Pull Request → Human Merge |
-| **3 · Live URL investigation** | Live URL → Live URL (`/live-url`): *Live URL* or *Live URL + Repo* | URL → DNS → TCP → TLS → HTTP → Evidence → Diagnosis | A structured report; never a code change. A repository adds evidence; a relationship is "possibly related", never "caused by". |
+| **Runtime self-healing** | Runtime → Systems, Incidents, Recovery history | Health, containers, logs, dependencies | Allowlisted, policy-checked runtime recovery, then verification. No source changes. |
+| **Code self-healing** | Code → Repositories (`/codebase`), Repairs | Repository analysis | Repository → Findings → Diagnosis → Repair → Sandbox Validation → Security Re-scan → Human Approval → Branch → Commit → Pull Request → Human Merge |
+| **Live URL investigation** | Live URL → Investigations (`/live-url`): *Live URL* or *Live URL + Repo* | URL → DNS → TCP → TLS → HTTP → Evidence → Diagnosis | A structured report; never a code change. A repository adds evidence; a relationship is "possibly related", never "caused by". |
 
-Level 2 and Level 3 are separate pages on one assessment engine: the Codebase page never shows live URL controls, and the Live URL page never shows Auto-Repair, Apply or any GitHub repair control. The Overview shows one card per level, built only from recorded runs; incident notifications (attention strip, bell, sidebar badge) are acknowledged per account and never change the incident.
+Code and Live URL are separate pages on one assessment engine: Repositories never shows live URL controls, and Investigations never shows Auto-Repair, Apply or any GitHub repair control. The interface names the boundaries (Runtime, Code, Live URL) rather than numbering them. The Overview shows one card per boundary, built only from recorded runs; incident notifications (attention strip, bell, sidebar badge) are acknowledged per account and never change the incident.
 
 ## What it does
 

@@ -233,13 +233,13 @@ describe('compact assessment workspace', () => {
     for (let i = 1; i < ordered.length; i++) expect(ordered[i - 1].compareDocumentPosition(ordered[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByText(/Informational findings/, { selector: 'summary' }).closest('details')).not.toHaveAttribute('open');
     expect(screen.getByText(/Assessment timeline/, { selector: 'summary' }).closest('details')).not.toHaveAttribute('open');
-    const sidebar = screen.getByRole('complementary', { name: 'Level 2 investigations' });
+    const sidebar = screen.getByRole('complementary', { name: 'Code runs' });
     const start = within(sidebar).getByText('Assess a repository');
     const recent = within(sidebar).getByText('Recent runs');
     expect(start.compareDocumentPosition(recent) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(sidebar).getByRole('button', { name: /Start codebase assessment/ })).toBeVisible();
     expect(start.closest('details')).toBeNull();
-    expect(screen.queryByText(/Level 2 · Codebase self-healing\./)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Repairable findings are fixed by a deterministic patch/)).not.toBeInTheDocument();
     expect(within(sidebar).getByText(/Scope & safety/, { selector: 'summary' }).closest('details')).not.toHaveAttribute('open');
   });
 
@@ -252,7 +252,7 @@ describe('compact assessment workspace', () => {
     await userEvent.click(history[1]);
     expect(await screen.findByRole('heading', { name: 'Second run.' })).toBeInTheDocument();
     expect(screen.queryByText(/Action-required issues/)).not.toBeInTheDocument();
-    expect(screen.getByRole('complementary', { name: 'Level 2 investigations' })).toBeInTheDocument();
+    expect(screen.getByRole('complementary', { name: 'Code runs' })).toBeInTheDocument();
   });
 });
 
@@ -318,7 +318,7 @@ describe('Level 2 Auto-Repair hands off to the existing Code Repair Journey', ()
       stubFetch((url) => url.endsWith('/api/assessments') ? [{ ...assessment, diagnosis: null }] : url.endsWith(assessment.id) ? assessment : null);
       render(<QueryClientProvider client={new QueryClient()}><MemoryRouter initialEntries={[`/live-url?assessment=${assessment.id}`]}><Routes><Route path="/live-url" element={<AssessmentsPage level={3} />} /></Routes></MemoryRouter></QueryClientProvider>);
       expect(await screen.findByRole('heading', { name: `Live ${kind}` })).toBeInTheDocument();
-      expect(screen.getByText('Level 3 · Live URL Investigation')).toBeInTheDocument();
+      expect(screen.getByText('Live URL investigation')).toBeInTheDocument();
       expect(screen.getByText('Possible hard-coded credential')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /Auto-Repair/ })).not.toBeInTheDocument();
       expect(screen.queryByRole('link', { name: /View Repair Details/ })).not.toBeInTheDocument();

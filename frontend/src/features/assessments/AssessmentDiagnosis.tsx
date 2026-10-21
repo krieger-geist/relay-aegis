@@ -157,7 +157,7 @@ export function FindingGroups({ diagnosis, assessmentId, originals, only, report
     const items = findingsOf(diagnosis, key);
     if (items.length === 0) return null;
     return <section key={key} className={`diag-group ${key.toLowerCase()}`} aria-label={title}>
-      {nonEmpty > 1 ? <h3>{reportOnly && key === 'AUTO_REPAIRABLE' ? 'Recoverable in Level 1' : title} <span>{items.length}</span></h3> : null}
+      {nonEmpty > 1 ? <h3>{reportOnly && key === 'AUTO_REPAIRABLE' ? 'Recoverable at runtime' : title} <span>{items.length}</span></h3> : null}
       {items.map((finding) => reportOnly ? <ReportFindingRow key={finding.id} finding={finding} recommendation={originals.find((o) => o.id === finding.id)?.recommendation} />
         : <FindingRow key={finding.id} finding={finding} assessmentId={assessmentId} recommendation={originals.find((o) => o.id === finding.id)?.recommendation} />)}
     </section>;
@@ -220,7 +220,7 @@ function ReportFindingRow({ finding, recommendation }: { finding: CanonicalFindi
       <span className="diag-meta">{lower(finding.source)} · {finding.component}</span>
     </header>
     {finding.actionability !== 'INFORMATIONAL' ? <p className="diag-why"><b>Recommendation:</b> {recommendationOf(finding, recommendation)}</p> : null}
-    {runtime ? <div className="diag-repair"><Link className="btn btn-sm" to={runtime}>Open Level 1 recovery <ChevronRight size={12} /></Link></div> : null}
+    {runtime ? <div className="diag-repair"><Link className="btn btn-sm" to={runtime}>Open runtime recovery <ChevronRight size={12} /></Link></div> : null}
     <FindingDetails finding={finding} />
   </article>;
 }

@@ -6,19 +6,19 @@ import { apiGet } from '@/lib/api/client';
 import type { Incident } from '@/types/domain';
 
 type NavItem = { to: string; label: string; icon: typeof Activity; end?: boolean };
-/** Navigation follows the three operating levels; each level's pages sit under its own heading. */
-const sections: { label: string; level?: string; items: NavItem[] }[] = [
+/** Navigation follows the three self-healing boundaries: Runtime, Code and Live URL, each under its own heading. */
+const sections: { label: string; items: NavItem[] }[] = [
   { label: 'Operate', items: [{ to: '/', label: 'Overview', icon: LayoutDashboard, end: true }] },
-  { label: 'Runtime', level: 'L1', items: [
+  { label: 'Runtime', items: [
     { to: '/applications', label: 'Systems', icon: AppWindow },
     { to: '/incidents', label: 'Incidents', icon: Bug },
     { to: '/history', label: 'Recovery history', icon: ClipboardList },
   ] },
-  { label: 'Codebase', level: 'L2', items: [
-    { to: '/codebase', label: 'Codebase', icon: FileCode2 },
+  { label: 'Code', items: [
+    { to: '/codebase', label: 'Repositories', icon: FileCode2 },
     { to: '/repairs', label: 'Repairs', icon: Wrench },
   ] },
-  { label: 'Live URL', level: 'L3', items: [{ to: '/live-url', label: 'Live URL', icon: Globe }] },
+  { label: 'Live URL', items: [{ to: '/live-url', label: 'Investigations', icon: Globe }] },
   { label: 'Configure', items: [
     { to: '/integrations', label: 'Integrations', icon: Blocks },
     { to: '/settings', label: 'Settings & security', icon: Settings2 },
@@ -57,7 +57,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
           <button className="icon-button sidebar-close" onClick={onClose} aria-label="Close navigation"><X size={17} /></button>
         </div>
         {sections.map((section, index) => <div key={section.label} className="nav-section">
-          <div className="nav-section-label" style={index ? undefined : { marginTop: 0 }}>{section.level ? <span className="nav-level">{section.level}</span> : null}{section.label}</div>
+          <div className="nav-section-label" style={index ? undefined : { marginTop: 0 }}>{section.label}</div>
           <nav className="nav-list" aria-label={section.label}>
             {section.items.map(({ to, label, icon: Icon, end }) => (
               <NavLink key={to} to={to} end={end} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} onClick={onClose} title={label} aria-label={label}>
@@ -70,7 +70,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         </div>)}
         <div className="sidebar-bottom">
           <div className="agent-status"><span className={`agent-dot ${health.isError ? 'offline' : ''}`} /><span>Reliability engine</span><span className="agent-caption">{health.isError ? 'Offline' : health.data ? 'Connected' : 'Checking'}</span></div>
-          <div className="sidebar-footer">RELAY AEGIS · Levels 1–3</div>
+          <div className="sidebar-footer">RELAY AEGIS</div>
         </div>
       </aside>
     </>

@@ -51,7 +51,7 @@ export function ApplicationsPage() {
         </tr>)}</tbody></table></div>
       )}
     </Panel>
-    <div className="info-box" style={{ marginTop: 16 }}><Globe size={15} /><div><strong>Connection boundary:</strong> registering a URL enables Level 1 monitoring only. Container recovery also needs an allowlisted container and a permitting policy; repository repairs run in Codebase (Level 2).</div></div>
+    <div className="info-box" style={{ marginTop: 16 }}><Globe size={15} /><div><strong>Connection boundary:</strong> registering a URL enables runtime monitoring only. Container recovery also needs an allowlisted container and a permitting policy; code repairs run under Code → Repositories.</div></div>
     {showModal ? <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowModal(false); }}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="register-title">
       <header className="modal-header"><div><h2 className="modal-title" id="register-title">Register system</h2><div className="modal-subtitle">Create a target for health monitoring. Health monitoring is enabled after registration. Docker recovery requires an explicit backend-allowlisted container.</div></div><button className="icon-button" onClick={() => setShowModal(false)} aria-label="Close registration"><X size={17} /></button></header>
       <form className="modal-content" onSubmit={submit}>

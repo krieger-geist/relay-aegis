@@ -12,8 +12,8 @@ const titles: Record<string, string> = {
   '/': 'Overview',
   '/applications': 'Systems',
   '/incidents': 'Incidents',
-  '/codebase': 'Codebase self-healing',
-  '/live-url': 'Live URL investigation',
+  '/codebase': 'Code · Repositories',
+  '/live-url': 'Live URL · Investigations',
   '/repairs': 'Repairs',
   '/history': 'Recovery history',
   '/integrations': 'Integrations',
@@ -328,8 +328,8 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
                       <button onClick={() => { setSearchOpen(false); navigate('/'); }}><Activity size={15} /><span>Overview</span></button>
                       <button onClick={() => { setSearchOpen(false); navigate('/applications'); }}><ShieldCheck size={15} /><span>Systems</span></button>
                       <button onClick={() => { setSearchOpen(false); navigate('/incidents'); }}><CircleAlert size={15} /><span>Incidents</span></button>
-                      <button onClick={() => { setSearchOpen(false); navigate('/codebase'); }}><Code2 size={15} /><span>Codebase</span></button>
-                      <button onClick={() => { setSearchOpen(false); navigate('/live-url'); }}><Globe size={15} /><span>Live URL</span></button>
+                      <button onClick={() => { setSearchOpen(false); navigate('/codebase'); }}><Code2 size={15} /><span>Repositories</span></button>
+                      <button onClick={() => { setSearchOpen(false); navigate('/live-url'); }}><Globe size={15} /><span>Live URL investigations</span></button>
                       <button onClick={() => { setSearchOpen(false); navigate('/repairs'); }}><Settings2 size={15} /><span>Repairs</span></button>
                     </div>
                     {incidentsQuery.isError ? <div className="popover-empty">Recent incidents are unavailable. <button className="text-button" onClick={() => void incidentsQuery.refetch()}>Retry</button></div> : sortedNotifications.length ? <div className="search-recent"><div className="popover-section-heading">Recently detected</div>{sortedNotifications.slice(0, 3).map((incident) => <button className="recent-search-item" key={incident.id} onClick={() => openResult({ key: incident.id, kind: 'incident', title: incident.title, subtitle: incident.id, path: `/incidents/${incident.id}` })}><span className="recent-severity" /> <span><strong>{incident.title}</strong><small>{incident.id} · {incident.applicationName}</small></span><ChevronRight size={14} /></button>)}</div> : null}

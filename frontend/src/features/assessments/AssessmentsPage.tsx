@@ -159,10 +159,10 @@ export function AssessmentsPage({ level }: { level: InvestigationLevel }) {
       description={config.description}
       actions={<span className="assessment-engine-state"><span /> Assessment engine ready</span>}
     />
-    <ol className={`level-flow level-${level}`} aria-label={`Level ${level} workflow`}>{config.flow.map((step) => <li key={step}>{step}</li>)}</ol>
+    <ol className={`level-flow level-${level}`} aria-label={`${config.name} workflow`}>{config.flow.map((step) => <li key={step}>{step}</li>)}</ol>
 
     <div className="assessment-control-room">
-      <aside className="assessment-sidebar" aria-label={`Level ${level} investigations`}>
+      <aside className="assessment-sidebar" aria-label={`${config.name} runs`}>
       <Panel title={level === 2 ? 'Assess a repository' : 'Investigate a live URL'} subtitle={level === 2 ? 'Read-only analysis · repairs run only from a finding' : 'Report only · nothing is modified'} className="assessment-form-panel assessment-start" provenance="live">
         <form className="assessment-form" onSubmit={submit}>
           {config.kinds.length > 1 ? <div className="assessment-kind-grid kinds-2" role="group" aria-label="Investigation source">

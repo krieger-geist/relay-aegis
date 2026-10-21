@@ -89,31 +89,35 @@ const live = (id: string, kind: 'url' | 'combined', diagnosis: AssessmentDiagnos
   summary: `Live ${kind} run ${id}`, findings: [], checks, patchableFindingIds: [], diagnosis,
 });
 
-describe('Level 2 and Level 3 are separate experiences', () => {
+describe('Code and Live URL are separate experiences', () => {
   const urlRun = live('ASM-URL', 'url', liveDiagnosis({}));
   const both = [assessment, urlRun];
 
-  it('the Codebase page is Level 2 only: its own workflow, no Live URL controls and no Level 3 runs', async () => {
+  it('the Code page holds only repositories: its own workflow, no Live URL controls and no live runs', async () => {
     renderAt('/codebase', both);
-    expect(await screen.findByText('Level 2 · Codebase Self-Healing')).toBeInTheDocument();
-    expect(screen.getByLabelText('Level 2 workflow')).toHaveTextContent(
+    expect(await screen.findByText('Code self-healing')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Repositories' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Code workflow')).toHaveTextContent(
       ['Repository', 'Findings', 'Diagnosis', 'Repair', 'Sandbox Validation', 'Security Re-scan', 'Human Approval', 'Branch', 'Commit', 'Pull Request', 'Human Merge'].join(''));
     expect(screen.queryByRole('button', { name: /Live URL/ })).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText('https://your-authorized-app.example')).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText('https://github.com/owner/repository')).toBeInTheDocument();
     expect(document.querySelectorAll('.assessment-history-item')).toHaveLength(1);
-    expect(screen.queryByText(/Level 3/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Live URL investigation')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Level \d/)).not.toBeInTheDocument();
   });
 
-  it('the Live URL page is Level 3 only: Live URL and Live URL + Repo, its own workflow, no Codebase source and no Level 2 runs', async () => {
+  it('the Live URL page holds Live URL and Live URL + Repo only: its own workflow, no repository source and no code runs', async () => {
     renderAt('/live-url', both);
-    expect(await screen.findByText('Level 3 · Live URL Investigation')).toBeInTheDocument();
-    expect(screen.getByLabelText('Level 3 workflow')).toHaveTextContent(['URL', 'DNS', 'TCP', 'TLS', 'HTTP', 'Evidence', 'Diagnosis'].join(''));
+    expect(await screen.findByText('Live URL investigation')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Investigations' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Live URL workflow')).toHaveTextContent(['URL', 'DNS', 'TCP', 'TLS', 'HTTP', 'Evidence', 'Diagnosis'].join(''));
     const sources = screen.getByRole('group', { name: 'Investigation source' });
     expect(within(sources).getByRole('button', { name: /^Live URL$/ })).toHaveAttribute('aria-pressed', 'true');
     expect(within(sources).getByRole('button', { name: /Live URL \+ Repo/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Codebase/ })).not.toBeInTheDocument();
-    expect(screen.queryByText(/Level 2/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Code self-healing')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Level \d/)).not.toBeInTheDocument();
     expect(document.querySelectorAll('.assessment-history-item')).toHaveLength(1);
     await userEvent.click(within(sources).getByRole('button', { name: /Live URL \+ Repo/ }));
     expect(screen.getByPlaceholderText('https://your-authorized-app.example')).toBeInTheDocument();
@@ -123,15 +127,15 @@ describe('Level 2 and Level 3 are separate experiences', () => {
   it('a run opened on the other level page, or through an old /assessments link, moves to its own level', async () => {
     renderAt('/codebase?assessment=ASM-URL', both);
     expect(await screen.findByRole('heading', { name: 'Live url run ASM-URL' })).toBeInTheDocument();
-    expect(screen.getByText('Level 3 · Live URL Investigation')).toBeInTheDocument();
+    expect(screen.getByText('Live URL investigation')).toBeInTheDocument();
     cleanup();
     renderAt('/assessments?assessment=ASM-1', both);
-    expect(await screen.findByText('Level 2 · Codebase Self-Healing')).toBeInTheDocument();
+    expect(await screen.findByText('Code self-healing')).toBeInTheDocument();
     expect(await screen.findByRole('heading', { name: 'Done.' })).toBeInTheDocument();
   });
 });
 
-describe('Level 3 evidence', () => {
+describe('Live URL evidence', () => {
   it('a DNS failure localizes the fault and marks every later layer not tested', async () => {
     const run = live('ASM-DNS', 'url', liveDiagnosis({
       layers: [layer('DNS', 'FAILED', 'The host name app.test did not resolve (host not found).'), layer('TCP', 'NOT_TESTED', 'Not tested because an earlier layer failed.'),
@@ -191,7 +195,7 @@ describe('Level 3 evidence', () => {
     expect(within(card).getByText('insufficient evidence')).toBeInTheDocument();
   });
 
-  it('Level 3 never exposes source repair, even for a repairable correlated finding; a runtime recovery links to Level 1', async () => {
+  it('a live investigation never exposes source repair, even for a repairable correlated finding; a runtime recovery links to its incident', async () => {
     const runtime = canonical('CORR-RUNTIME-STOPPED', { title: 'Endpoint failure coincides with a stopped container', actionability: 'AUTO_REPAIRABLE',
       repair: { type: 'RUNTIME_RECOVERY', label: 'Auto-Repair', targetId: 'INC-7', state: 'REPAIRABLE', stateDetail: null, link: '/incidents/INC-7' } });
     const code = canonical('F-CODE', { title: 'Possible hard-coded credential', source: 'GITHUB', actionability: 'AUTO_REPAIRABLE',
@@ -201,8 +205,8 @@ describe('Level 3 evidence', () => {
     expect(await screen.findByText(/Findings requiring action \(3\)/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Auto-Repair|Propose patch|Apply/ })).not.toBeInTheDocument();
     expect(screen.queryByText('Auto-repairable')).not.toBeInTheDocument();
-    expect(screen.getByText('Recoverable in Level 1')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Open Level 1 recovery/ })).toHaveAttribute('href', '/incidents/INC-7');
+    expect(screen.getByText('Recoverable at runtime')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Open runtime recovery/ })).toHaveAttribute('href', '/incidents/INC-7');
     expect(screen.queryByRole('region', { name: 'Verification' })).not.toBeInTheDocument();
   });
 });

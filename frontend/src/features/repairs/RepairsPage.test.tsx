@@ -88,9 +88,9 @@ describe('Level 2 codebase repair journey', () => {
   const stage = (name: string) => within(screen.getByRole('list', { name: 'Code repair steps' })).getByText(name).closest('li')!;
   const facts = () => screen.getByLabelText('Validated, approved, pull request, merged');
 
-  it('is labelled as Level 2 codebase self-healing', async () => {
+  it('is labelled as code self-healing', async () => {
     renderDetail(proposal);
-    expect(await screen.findByText('Level 2 · Codebase Self-Healing')).toBeInTheDocument();
+    expect(await screen.findByText('Code self-healing')).toBeInTheDocument();
   });
 
   it('a failed validation is blocked, explains why and is never shown as a success', async () => {

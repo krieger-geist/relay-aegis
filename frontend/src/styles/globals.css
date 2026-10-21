@@ -410,7 +410,6 @@ code, pre, .mono { font-family: var(--font-mono); }
 /* Level-grouped navigation */
 .nav-section + .nav-section .nav-section-label { margin-top: 16px; }
 .nav-section-label { display: flex; align-items: center; gap: 7px; margin: 0 0 6px; font-size: 11px; }
-.nav-level { padding: 0 5px; border-radius: 4px; font-family: var(--font-mono); font-size: 10px; letter-spacing: .04em; color: inherit; border: 1px solid currentColor; opacity: .85; }
 .nav-section .nav-list { gap: 2px; }
 /* Overview: one card per operating level */
 .level-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
