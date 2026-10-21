@@ -284,6 +284,8 @@ export interface DashboardSummary {
 }
 
 export type AssessmentKind = 'repository' | 'url' | 'combined';
+/** GET /api/assessments/target-policy: which live URL targets may be investigated. */
+export interface TargetPolicy { allowPublicHosts: boolean; allowedHosts: string[] }
 export type AssessmentRunStatus = 'queued' | 'running' | 'completed' | 'failed';
 export type AssessmentSeverity = 'info' | 'low' | 'medium' | 'high' | 'critical';
 

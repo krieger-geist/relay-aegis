@@ -9,7 +9,7 @@
 7. AI diagnosis is advisory and must never independently authorize or execute a recovery action.
 8. Assessment triage sends finding metadata only. Incident diagnosis may send recorded incident context/evidence to Gemini; do not transmit secrets or sensitive personal data.
 9. GitHub repository scanning is read-only, shallow, resource-bounded, and does not execute repository code. Public repository scanning is not permission to modify that repository.
-10. Live URL assessment and monitoring require explicit hostname allowlists and target authorization. Do not follow redirects or probe private networks through user-supplied URLs.
+10. Live URL assessment and monitoring require explicit hostname allowlists and target authorization. The operator may opt in to investigating any public website (`RELAY_ASSESSMENT_ALLOW_PUBLIC_HOSTS=true`, off by default); even then private, loopback, link-local, CGNAT and unique-local addresses are refused before every request. Do not follow redirects or probe private networks through user-supplied URLs.
 11. No production recovery is permitted in this release. Recovery must remain allowlist- and policy-controlled; enabling automatic recovery requires typed `CONFIRM-AUTO-REPAIR`.
 12. Do not claim code repair, passing tests, external email delivery, or a successful recovery unless those operations actually ran and were verified.
 13. Typography: Space Grotesk (`--font-display`) for headings and key numbers, IBM Plex Sans (`--font-sans`) for UI text, IBM Plex Mono (`--font-mono`) for identifiers, logs and code. Use CSS tokens rather than hard-coded colors in React components.

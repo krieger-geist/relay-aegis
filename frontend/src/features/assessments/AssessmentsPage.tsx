@@ -9,7 +9,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { Panel } from '@/components/common/Panel';
 import { LoadingState, ErrorState, EmptyState } from '@/components/feedback/States';
 import { apiGet, apiPost } from '@/lib/api/client';
-import type { Assessment, AssessmentCheck, AssessmentFinding, AssessmentKind, AssessmentReport, AssessmentTimelineStep, CreateAssessmentRequest, RepairJob } from '@/types/domain';
+import type { Assessment, AssessmentCheck, TargetPolicy, AssessmentFinding, AssessmentKind, AssessmentReport, AssessmentTimelineStep, CreateAssessmentRequest, RepairJob } from '@/types/domain';
 import '@/styles/assessment.css';
 import { DiagnosisSummary, FindingGroups, VerificationSummary } from './AssessmentDiagnosis';
 import { LiveEvidencePath, RepositoryCorrelation } from './LiveEvidence';
@@ -85,6 +85,9 @@ export function AssessmentsPage({ level }: { level: InvestigationLevel }) {
     onSuccess: async (response) => { await queryClient.invalidateQueries({ queryKey: ['repairs'] }); navigate(`/repairs/${response.data.id}`); },
     onError: (error) => setLocalNotice(error.message),
   });
+  const targetPolicy = useQuery({ queryKey: ['assessment-target-policy'], queryFn: () => apiGet<TargetPolicy>('/api/assessments/target-policy'), enabled: level === 3, staleTime: 60000, retry: false });
+  const policy = targetPolicy.data?.data;
+  const hostHint = !policy ? 'Host must be permitted' : policy.allowPublicHosts ? 'Any public website · standard port' : `Allowed: ${policy.allowedHosts.join(', ')}`;
   const reportQuery = useMutation({ mutationFn: (id: string) => apiGet<AssessmentReport>(`/api/assessments/${id}/report`) });
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -172,7 +175,7 @@ export function AssessmentsPage({ level }: { level: InvestigationLevel }) {
           </div> : null}
 
           {kind !== 'url' ? <label className="assessment-field"><span>GitHub repository URL <em>Public only · pin a commit with /commit/&lt;sha&gt;</em></span><input type="url" value={repositoryUrl} onChange={(event) => setRepositoryUrl(event.target.value)} placeholder="https://github.com/owner/repository" required maxLength={1000} /></label> : null}
-          {kind !== 'repository' ? <label className="assessment-field"><span>Application URL <em>Host must be allowlisted</em></span><input type="url" value={applicationUrl} onChange={(event) => setApplicationUrl(event.target.value)} placeholder="https://your-authorized-app.example" required maxLength={2000} /></label> : null}
+          {kind !== 'repository' ? <label className="assessment-field"><span>Application URL <em title={policy?.allowedHosts.join(', ')}>{hostHint}</em></span><input type="url" value={applicationUrl} onChange={(event) => setApplicationUrl(event.target.value)} placeholder="https://your-authorized-app.example" required maxLength={2000} /></label> : null}
 
           <label className="assessment-consent-row"><input type="checkbox" checked={authorized} onChange={(event) => setAuthorized(event.target.checked)} /><span>{level === 2 ? 'I own this repository or have explicit authorization to assess it.' : 'I own this target or have explicit authorization to assess it. I understand that live checks will make a request to the target.'}</span></label>
           <label className="assessment-consent-row"><input type="checkbox" checked={aiTriage} onChange={(event) => setAiTriage(event.target.checked)} /><span><strong>Request AI triage</strong><small>When Gemini is configured, send finding metadata only. Repository source files and HTTP response bodies are not sent.</small></span></label>
@@ -190,7 +193,7 @@ export function AssessmentsPage({ level }: { level: InvestigationLevel }) {
               <div><FileCode2 size={15} /><span><strong>Evidence before conclusions</strong><small>Automated results remain candidates until validated.</small></span></div>
               <div><Mail size={15} /><span><strong>Human-approved disclosure</strong><small>Reports are drafted, never silently emailed.</small></span></div>
             </div>
-            {kind !== 'repository' ? <div className="assessment-scope-note"><ShieldAlert size={15} /><div><strong>Live URL scope</strong><p>Only one GET request is made. No crawling, fuzzing, form submission, redirect following, or private-network probing. Do not include secrets in the URL. Add an external hostname explicitly to <code>RELAY_ASSESSMENT_ALLOWED_HOSTS</code> in the backend environment before assessing it.</p></div></div> : null}
+            {kind !== 'repository' ? <div className="assessment-scope-note"><ShieldAlert size={15} /><div><strong>Live URL scope</strong><p>A few bounded GET requests (repeated samples and the site root). No crawling, fuzzing, form submission, redirect following, or private-network probing; private and internal addresses are refused before every request. Do not include secrets in the URL.{policy?.allowPublicHosts ? ' Any public website may be investigated: only assess sites you are authorized to test.' : <> Add an external hostname to <code>RELAY_ASSESSMENT_ALLOWED_HOSTS</code>, or set <code>RELAY_ASSESSMENT_ALLOW_PUBLIC_HOSTS=true</code>, in the backend environment.</>}</p></div></div> : null}
             {kind !== 'url' ? <div className="assessment-scope-note"><Github size={15} /><div><strong>Repository scope</strong><p>The analyzer supports public GitHub repositories. It checks files read-only; it does not run package scripts, build files, tests, Dockerfiles, or repository code.</p></div></div> : null}
           </details>
         </form>

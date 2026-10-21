@@ -266,6 +266,13 @@ public class LiveUrlAnalyzer {
     }
 
     private HttpResponse<InputStream> get(URI uri) throws Exception {
+        // The HTTP client resolves the host itself, so re-check every address right before each request: a name that now
+        // points at a private, loopback or link-local address (DNS rebinding) is never contacted.
+        for (java.net.InetAddress address : java.net.InetAddress.getAllByName(uri.getHost())) {
+            if (!targetPolicy.isPermittedAddress(uri.getHost(), address)) {
+                throw new java.io.IOException("the host now resolves to a non-public address, so the request was not sent");
+            }
+        }
         HttpRequest request = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(7))
                 .header("User-Agent", "RELAY-AEGIS-Assessment/0.2 (+non-invasive; contact-site-owner)")
                 .header("Accept", "text/html,application/json,*/*;q=0.5").GET().build();
@@ -301,6 +308,8 @@ public class LiveUrlAnalyzer {
     private static String safeFailure(Exception ex) {
         if (ex instanceof java.net.http.HttpTimeoutException) return "Request timed out within the configured 7-second deadline.";
         if (ex instanceof java.net.UnknownHostException) return "Target host could not be resolved.";
+        if (ex instanceof java.io.IOException && ex.getMessage() != null && ex.getMessage().startsWith("the host now resolves to a non-public address"))
+            return "Request not sent: the host now resolves to a non-public address (private and internal targets are never contacted).";
         String name = ex.getClass().getSimpleName();
         if (name.contains("SSL") || name.contains("Certificate")) return "TLS certificate or handshake validation failed.";
         return "Connection failed or timed out; detailed network errors are withheld from the report.";

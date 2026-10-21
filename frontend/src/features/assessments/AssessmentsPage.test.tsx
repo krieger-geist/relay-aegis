@@ -210,3 +210,27 @@ describe('Live URL evidence', () => {
     expect(screen.queryByRole('region', { name: 'Verification' })).not.toBeInTheDocument();
   });
 });
+
+describe('Live URL target policy', () => {
+  function renderWithPolicy(policy: { allowPublicHosts: boolean; allowedHosts: string[] }) {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      const data = String(url).endsWith('/api/assessments/target-policy') ? policy : String(url).endsWith('/api/assessments') ? [] : null;
+      return new Response(JSON.stringify({ data, provenance: 'live', updatedAt: '' }), { status: 200 });
+    }));
+    render(<QueryClientProvider client={new QueryClient()}><MemoryRouter initialEntries={['/live-url']}>
+      <Routes><Route path="/live-url" element={<AssessmentsPage level={3} />} /></Routes>
+    </MemoryRouter></QueryClientProvider>);
+  }
+
+  it('says any public website may be investigated when the operator enabled it', async () => {
+    renderWithPolicy({ allowPublicHosts: true, allowedHosts: ['localhost', 'test-target'] });
+    expect(await screen.findByText('Any public website · standard port')).toBeInTheDocument();
+    expect(screen.getByText(/only assess sites you are authorized to test/)).toBeInTheDocument();
+  });
+
+  it('lists the exact allowed hosts otherwise', async () => {
+    renderWithPolicy({ allowPublicHosts: false, allowedHosts: ['example.com', 'localhost', 'test-target'] });
+    expect(await screen.findByText('Allowed: example.com, localhost, test-target')).toBeInTheDocument();
+    expect(screen.getByText('RELAY_ASSESSMENT_ALLOW_PUBLIC_HOSTS=true')).toBeInTheDocument();
+  });
+});

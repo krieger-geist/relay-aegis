@@ -13,7 +13,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Explicit per-host allowlist for URL assessments; redirects are never followed. A host that does not resolve is
+ * Explicit per-host allowlist for URL assessments, or, when the operator opts in with
+ * {@code RELAY_ASSESSMENT_ALLOW_PUBLIC_HOSTS=true}, any host that resolves only to public addresses; redirects are never followed. A host that does not resolve is
  * accepted at creation so the scan can report the DNS failure as evidence; every address the scan connects to is
  * re-checked with {@link #isPermittedAddress} (no private, loopback, link-local, CGNAT or unique-local targets except
  * the configured local development hosts).
@@ -21,13 +22,30 @@ import org.springframework.web.server.ResponseStatusException;
 @Component
 public class AssessmentTargetPolicy {
     private final Set<String> allowedHosts;
+    private final boolean allowPublicHosts;
     private static final Set<String> LOCAL_HOSTS = Set.of("localhost", "127.0.0.1", "::1", "test-target");
 
-    public AssessmentTargetPolicy(@Value("${relay.assessment.allowed-hosts:localhost,127.0.0.1,test-target}") String configuredHosts) {
+    public AssessmentTargetPolicy(String configuredHosts) {
+        this(configuredHosts, false);
+    }
+
+    /**
+     * @param allowPublicHosts opt-in: accept any host that resolves only to public IP addresses. Every other protection
+     *                         stays: private/loopback/link-local/CGNAT/unique-local addresses are refused here and again at
+     *                         connect time, external targets use standard ports, and credentials, queries and redirects are refused.
+     */
+    @org.springframework.beans.factory.annotation.Autowired
+    public AssessmentTargetPolicy(@Value("${relay.assessment.allowed-hosts:localhost,127.0.0.1,test-target}") String configuredHosts,
+                                  @Value("${relay.assessment.allow-public-hosts:false}") boolean allowPublicHosts) {
         this.allowedHosts = Arrays.stream(configuredHosts.split(","))
                 .map(String::trim).map(s -> s.toLowerCase(Locale.ROOT)).filter(s -> !s.isBlank())
                 .collect(Collectors.toUnmodifiableSet());
+        this.allowPublicHosts = allowPublicHosts;
     }
+
+    public boolean allowsPublicHosts() { return allowPublicHosts; }
+
+    public java.util.List<String> allowedHosts() { return allowedHosts.stream().sorted().toList(); }
 
     public URI validate(String raw) {
         if (raw == null || raw.isBlank()) throw bad("Enter an application URL.");
@@ -46,8 +64,9 @@ public class AssessmentTargetPolicy {
         if (!localDevelopmentTarget && uri.getPort() != -1
                 && uri.getPort() != (scheme.equalsIgnoreCase("https") ? 443 : 80))
             throw bad("External assessment targets must use their standard HTTP/HTTPS port in this MVP.");
-        if (!allowedHosts.contains(normalizedHost))
-            throw bad("Target host is not allowlisted. Add the exact host to RELAY_ASSESSMENT_ALLOWED_HOSTS and restart the backend.");
+        if (!allowedHosts.contains(normalizedHost) && !(allowPublicHosts && !localDevelopmentTarget))
+            throw bad("Target host " + normalizedHost + " is not allowlisted. Add the exact host to RELAY_ASSESSMENT_ALLOWED_HOSTS, or set "
+                    + "RELAY_ASSESSMENT_ALLOW_PUBLIC_HOSTS=true to allow any public website, then restart the backend.");
         if (!localDevelopmentTarget) {
             InetAddress[] addresses;
             try { addresses = InetAddress.getAllByName(normalizedHost); }

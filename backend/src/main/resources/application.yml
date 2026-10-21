@@ -112,6 +112,8 @@ relay:
   assessment:
     # Exact hostname allowlist; public hostnames must be explicitly added by the operator.
     allowed-hosts: ${RELAY_ASSESSMENT_ALLOWED_HOSTS:localhost,127.0.0.1,test-target}
+    # Opt-in: also accept any host that resolves only to public IPs (private/internal targets stay blocked).
+    allow-public-hosts: ${RELAY_ASSESSMENT_ALLOW_PUBLIC_HOSTS:false}
 logging:
   level:
     com.relayaegis: INFO

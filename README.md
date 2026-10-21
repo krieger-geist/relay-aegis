@@ -94,6 +94,7 @@ Key settings in `.env` (see `.env.example` for all of them):
 | Variable | Purpose |
 |---|---|
 | `RELAY_MONITORING_ALLOWED_HOSTS`, `RELAY_ASSESSMENT_ALLOWED_HOSTS` | Hosts that may be monitored / assessed |
+| `RELAY_ASSESSMENT_ALLOW_PUBLIC_HOSTS` | `true` lets Live URL investigate any public website (off by default). Private and internal addresses stay blocked and are re-checked before every request; standard ports only; no redirects, credentials or query strings |
 | `RELAY_DOCKER_ALLOWED_CONTAINERS` | Containers recovery may act on (default `relay-aegis-test-target`) |
 | `RELAY_SANDBOX_ENABLED`, `RELAY_SANDBOX_NETWORK` | Enable sandbox validation; `bridge` when builds must download dependencies |
 | `RELAY_GITHUB_TOKEN`, `RELAY_GITHUB_REMEDIATION_REPOSITORIES`, `RELAY_GITHUB_REMEDIATION_APPROVERS` | Pull-request remediation (fine-grained token, contents + pull requests write on the listed repositories only) |

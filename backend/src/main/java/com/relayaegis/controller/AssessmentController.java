@@ -21,7 +21,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class AssessmentController {
     private final AssessmentService assessments;
     private final com.relayaegis.repair.RepairOrchestrator repairs;
-    public AssessmentController(AssessmentService assessments, com.relayaegis.repair.RepairOrchestrator repairs) {
+    private final com.relayaegis.assessment.AssessmentTargetPolicy targets;
+    public record TargetPolicyDto(boolean allowPublicHosts, java.util.List<String> allowedHosts) {}
+    public AssessmentController(AssessmentService assessments, com.relayaegis.repair.RepairOrchestrator repairs,
+                                com.relayaegis.assessment.AssessmentTargetPolicy targets) {
+        this.targets = targets;
         this.assessments = assessments; this.repairs = repairs;
     }
 
@@ -36,6 +40,12 @@ public class AssessmentController {
     @GetMapping("/{id}/findings/{findingId}/auto-repair")
     public ApiEnvelope<com.relayaegis.dto.FindingDtos.RepairProgressDto> repairProgress(@PathVariable String id, @PathVariable String findingId) {
         return ApiEnvelope.of(repairs.progress(com.relayaegis.repair.RepairStrategy.Target.finding(id, findingId)), "live");
+    }
+
+    /** Which live URL targets may be investigated: the configured hosts, and whether any public host is allowed. */
+    @GetMapping("/target-policy")
+    public ApiEnvelope<TargetPolicyDto> targetPolicy() {
+        return ApiEnvelope.of(new TargetPolicyDto(targets.allowsPublicHosts(), targets.allowedHosts()), "live");
     }
 
     @GetMapping
