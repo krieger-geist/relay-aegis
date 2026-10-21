@@ -1,0 +1,308 @@
+openapi: 3.1.0
+info:
+  title: RELAY AEGIS API
+  version: 1.0.0
+  description: >-
+    Evidence-driven self-healing API: monitoring, deterministic diagnosis, policy-gated runtime recovery,
+    live URL and GitHub assessment, sandbox-validated Auto-Repair and approval-gated pull requests.
+    Responses use the envelope {data, provenance, updatedAt}. Errors use {status, error, message}.
+servers:
+  - url: http://localhost:8080
+    description: Local Spring Boot API (also proxied at http://localhost:5173/api)
+security:
+  - bearerAuth: []
+paths:
+  /api/health:
+    get:
+      summary: API health
+      security: []
+      responses:
+        '200': {description: OK}
+  /api/metrics/summary:
+    get:
+      summary: Dashboard summary and response-time series
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+  /api/auth/register:
+    post:
+      summary: "Register an account (requires header X-Relay-Client: web)"
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name: {type: string}
+                email: {type: string, format: email}
+                password: {type: string, format: password}
+      responses:
+        '200': {description: OK}
+  /api/auth/login:
+    post:
+      summary: Log in; returns an access token and sets the HttpOnly refresh cookie
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: {type: string, format: email}
+                password: {type: string, format: password}
+      responses:
+        '200': {description: OK}
+  /api/auth/refresh:
+    post:
+      summary: Rotate the refresh cookie and issue a new access token
+      security: []
+      responses:
+        '200': {description: OK}
+  /api/auth/logout:
+    post:
+      summary: Revoke the refresh session
+      security: []
+      responses:
+        '200': {description: OK}
+  /api/auth/me:
+    get:
+      summary: Current user
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+  /api/applications:
+    get:
+      summary: List registered applications
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+    post:
+      summary: Register an application (host must be allowlisted)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, url]
+              properties:
+                name: {type: string}
+                url: {type: string, format: uri}
+                framework: {type: string}
+                environment: {type: string, enum: [Development, Staging, Production]}
+                description: {type: string}
+                githubRepository: {type: string}
+                dockerContainer: {type: string}
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+  /api/applications/{id}:
+    get:
+      summary: Application detail
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+  /api/applications/{id}/checks:
+    post:
+      summary: Run a health check now
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+  /api/applications/{id}/checks/history:
+    get:
+      summary: Health check history
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+  /api/incidents:
+    get:
+      summary: List incidents
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+  /api/incidents/{id}:
+    get:
+      summary: Incident with evidence, diagnosis and verification
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+  /api/incidents/{id}/diagnose:
+    post:
+      summary: Re-run diagnosis (deterministic engine, optional AI hypothesis)
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+  /api/incidents/{id}/recover:
+    post:
+      summary: Run the policy-checked recovery action
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+  /api/incidents/{id}/resolution-progress:
+    get:
+      summary: Recovery and verification progress
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+  /api/incidents/{id}/findings:
+    get:
+      summary: Incident as canonical findings
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+  /api/incidents/{id}/auto-repair:
+    post:
+      summary: Start Auto-Repair (runtime recovery strategy)
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+    get:
+      summary: Auto-Repair progress and state
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+  /api/recovery-history:
+    get:
+      summary: Recorded recovery outcomes
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+  /api/recovery-policies:
+    get:
+      summary: Recovery policies
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+  /api/recovery-policies/{id}:
+    put:
+      summary: Update a recovery policy mode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                mode: {type: string}
+                confirmation: {type: string, description: 'CONFIRM-AUTO-REPAIR is required to enable automatic recovery'}
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+  /api/integrations:
+    get:
+      summary: Integration status (Docker, GitHub, Gemini, …); never returns secrets
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+  /api/integrations/{id}/verify:
+    post:
+      summary: Verify an integration's connectivity
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+  /api/assessments:
+    get:
+      summary: List assessments
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+    post:
+      summary: Start a repository, live URL or combined assessment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, authorized]
+              properties:
+                kind: {type: string, enum: [repository, url, combined]}
+                repositoryUrl: {type: string}
+                applicationUrl: {type: string}
+                authorized: {type: boolean}
+                aiTriage: {type: boolean}
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+  /api/assessments/{id}:
+    get:
+      summary: Assessment with findings, checks, timeline and canonical diagnosis
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+  /api/assessments/{id}/report:
+    get:
+      summary: Markdown report
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+  /api/assessments/{id}/findings/{findingId}/auto-repair:
+    post:
+      summary: "Start Auto-Repair (GitHub patch strategy): safety checks, sandbox validation"
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+    get:
+      summary: Auto-Repair progress and state
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+  /api/repairs:
+    get:
+      summary: List patch proposals
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+  /api/repairs/proposals:
+    post:
+      summary: Queue a patch proposal for a finding
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [assessmentId, findingId]
+              properties:
+                assessmentId: {type: string}
+                findingId: {type: string}
+      responses:
+        '202': {description: Accepted}
+        '401': {description: Missing or invalid access token}
+  /api/repairs/{id}:
+    get:
+      summary: Patch proposal with redacted diff and validation checks
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+  /api/repairs/{id}/github:
+    get:
+      summary: Whether Apply & Create PR is available, and why not
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+  /api/repairs/{id}/github/pull-request:
+    post:
+      summary: "Apply the validated patch: branch, commit, pull request (never merged); idempotent"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                acknowledgePreexistingTestFailures: {type: boolean}
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

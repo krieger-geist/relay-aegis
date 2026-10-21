@@ -1,0 +1,69 @@
+/* System workspace: runtime self-healing on one page (Detect → Diagnose → Repair → Verify). Uses the shared design tokens. */
+.system-health-strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:0 0 16px}
+.system-tile{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:start;padding:12px 14px;border:1px solid var(--border);border-left:3px solid var(--border-strong,var(--border));border-radius:8px;background:var(--surface-1)}
+.system-tile.ok{border-left-color:var(--status-healthy-fg)}
+.system-tile.warn{border-left-color:var(--status-warning-fg)}
+.system-tile.bad{border-left-color:var(--status-recovery-failed-fg);background:var(--status-recovery-failed-bg)}
+.system-tile-icon{display:grid;place-items:center;width:30px;height:30px;border-radius:7px;background:var(--surface-2);color:var(--brand-600)}
+.system-tile-copy{display:grid;gap:2px;min-width:0}
+.system-tile-label{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}
+.system-tile-copy strong{font-family:var(--font-display);font-size:15px;font-weight:650;overflow-wrap:anywhere}
+.system-tile-copy small{font-size:11px;line-height:1.45;color:var(--text-secondary)}
+.system-tile-mark{margin-top:2px;color:var(--text-disabled,var(--text-muted))}
+.system-tile.ok .system-tile-mark{color:var(--status-healthy-fg)}
+.system-tile.bad .system-tile-mark{color:var(--status-recovery-failed-fg)}
+
+.system-incident{display:grid;gap:14px;margin:0 0 16px;padding:16px 18px;border:1px solid var(--border);border-left:4px solid var(--border-strong,var(--border));border-radius:10px;background:var(--surface-1);box-shadow:0 1px 3px rgb(15 23 42 / 5%)}
+.system-incident.healthy{border-left-color:var(--status-healthy-fg)}
+.system-incident.active{border-left-color:var(--status-active-incident-fg);border-color:var(--status-active-incident-border)}
+.system-incident.repairing{border-left-color:var(--status-repairing-fg);border-color:var(--status-repairing-border)}
+.system-incident.resolved{border-left-color:var(--status-healthy-fg);border-color:var(--status-healthy-border);background:linear-gradient(180deg,var(--status-healthy-bg),var(--surface-1) 70%)}
+.system-incident.recovered{border-left-color:var(--status-healthy-fg)}
+.system-incident-head{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:start}
+.system-incident.healthy .system-incident-head>svg,.system-incident.resolved .system-incident-head>svg,.system-incident.recovered .system-incident-head>svg{color:var(--status-healthy-fg);margin-top:2px}
+.system-incident.healthy .system-incident-head,.system-incident.resolved .system-incident-head,.system-incident.recovered .system-incident-head{grid-template-columns:auto minmax(0,1fr) auto}
+.system-incident-head h2{font-family:var(--font-display);margin:2px 0 4px;font-size:18px;font-weight:650;letter-spacing:-.02em}
+.system-incident.resolved .system-incident-head h2{color:var(--status-healthy-fg);font-size:20px}
+.system-incident-head p{margin:0;font-size:12px;line-height:1.55;color:var(--text-secondary)}
+.system-kicker{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted)}
+
+.system-lifecycle{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.system-lifecycle li{display:flex;align-items:center;justify-content:center;gap:6px;padding:7px 8px;border:1px solid var(--border);border-radius:7px;background:var(--surface-2);font-size:12px;font-weight:600;color:var(--text-muted)}
+.system-lifecycle li.done{color:var(--status-healthy-fg);background:var(--status-healthy-bg);border-color:var(--status-healthy-border)}
+.system-lifecycle li.active{color:var(--status-repairing-fg);background:var(--status-repairing-bg);border-color:var(--status-repairing-border)}
+.system-lifecycle li.failed{color:var(--status-recovery-failed-fg);background:var(--status-recovery-failed-bg);border-color:var(--status-recovery-failed-border)}
+.system-lifecycle.idle li{font-weight:500}
+.system-lifecycle.idle li+li::before{content:"→";margin-right:6px;color:var(--text-disabled,var(--text-muted))}
+
+.system-incident-body{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+.system-diagnosis,.system-recovery{display:grid;gap:8px;align-content:start;padding:12px 14px;border:1px solid var(--border);border-radius:8px;background:var(--surface-1)}
+.system-diagnosis h3,.system-recovery h3{display:flex;align-items:center;gap:6px;margin:0;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}
+.system-cause{margin:0;font-size:13px;line-height:1.5}
+.system-cause strong{display:block;font-family:var(--font-display);font-size:15px;margin-bottom:2px}
+.system-confidence{margin:0;font-size:11px;color:var(--text-secondary)}
+.system-confidence b{color:var(--text-primary)}
+.system-muted{margin:0;font-size:12px;color:var(--text-muted);line-height:1.5}
+.system-evidence{list-style:none;margin:0;padding:0;display:grid;gap:5px}
+.system-evidence li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 8px;align-items:start;padding:6px 8px;border-radius:6px;background:var(--surface-2);font-size:12px;line-height:1.45}
+.system-evidence li small{grid-column:2;font-size:10px;color:var(--text-muted)}
+.system-evidence li.supports svg{color:var(--status-healthy-fg)}
+.system-evidence li.contradicts svg{color:var(--status-recovery-failed-fg)}
+.system-evidence li.missing svg{color:var(--text-muted)}
+.system-repair-offer{display:grid;gap:8px}
+.system-repair-offer>p{margin:0;font-size:13px;line-height:1.5}
+.system-policy{display:flex;align-items:center;gap:6px;margin:0;font-size:11px;color:var(--text-muted)}
+.system-repair-offer .btn-primary{justify-self:start;box-shadow:0 2px 8px rgb(43 68 214 / 22%)}
+.system-recovery .small-link{display:inline-flex;align-items:center;gap:3px;font-size:12px;width:max-content}
+.system-incident .diag-progress{grid-template-columns:1fr}
+
+@media (max-width:1024px){.system-incident-body{grid-template-columns:1fr}}
+@media (max-width:768px){.system-incident-head{grid-template-columns:auto minmax(0,1fr)}.system-incident-head>.status-badge,.system-incident-head>.btn{grid-column:2;justify-self:start}}
+@media (max-width:600px){.system-health-strip{grid-template-columns:1fr}.system-lifecycle{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:420px){.system-incident{padding:12px}.system-lifecycle li{font-size:11px;padding:6px}}
+
+/* Failure class and the four-signal strip */
+.system-health-strip{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+.system-class{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin:0;font-size:12px;color:var(--text-secondary)}
+.system-class-label{font-family:var(--font-mono);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;padding:3px 8px;border-radius:5px;border:1px solid var(--border-strong,var(--border));background:var(--surface-2);color:var(--text-primary)}
+.system-incident.active .system-class-label{color:var(--status-active-incident-fg);background:var(--status-active-incident-bg);border-color:var(--status-active-incident-border)}
+.system-incident.resolved .system-class-label,.system-incident.recovered .system-class-label{color:var(--status-healthy-fg);background:var(--status-healthy-bg);border-color:var(--status-healthy-border)}

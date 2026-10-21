@@ -1,0 +1,76 @@
+:root {
+  --font-display: 'Space Grotesk Variable', 'Space Grotesk', 'IBM Plex Sans Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'IBM Plex Sans Variable', 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+  color-scheme: light;
+  --bg-app: #f4f6f9;
+  --bg-app-alt: #ebeef3;
+  --bg-sidebar: #121826;
+  --nav-hover: #1d2535;
+  --nav-active: #26304a;
+  --nav-text: #b6bfd1;
+  --nav-text-active: #ffffff;
+  --surface-1: #ffffff;
+  --surface-2: #f9fafc;
+  --surface-elevated: #ffffff;
+  --input-bg: #ffffff;
+  --row-hover: #f1f4f9;
+  --row-selected: #e8edff;
+  --code-bg: #f7f8fa;
+  --text-primary: #131a26;
+  --text-secondary: #444e60;
+  --text-muted: #5f6a7d;
+  --text-disabled: #98a1b1;
+  --text-on-brand: #ffffff;
+  --border: #dde2ea;
+  --border-strong: #c5ccd8;
+  --brand-600: #2b44d6;
+  --brand-700: #2237b5;
+  --brand-800: #1b2b8f;
+  --brand-100: #e8edff;
+  --brand-secondary: #0f766e;
+  --link: #2740c4;
+  --focus-ring: #2b44d6;
+  --ai-600: #6d3fd0;
+  --ai-bg: #f3eefd;
+  --ai-border: #c9b6f2;
+
+  --status-healthy-fg: #17703f; --status-healthy-bg: #e7f5ec; --status-healthy-border: #a9dabb;
+  --status-degraded-fg: #a24a07; --status-degraded-bg: #fdf0dd; --status-degraded-border: #f0c58a;
+  --status-warning-fg: #7a5f00; --status-warning-bg: #fbf4cc; --status-warning-border: #e4d27a;
+  --status-active-incident-fg: #ba3b0c; --status-active-incident-bg: #fde9dd; --status-active-incident-border: #f2b697;
+  --status-critical-fg: #ffffff; --status-critical-bg: #b42318; --status-critical-border: #b42318;
+  --status-diagnosing-fg: #5b31b8; --status-diagnosing-bg: #f3eefd; --status-diagnosing-border: #c9b6f2;
+  --status-repairing-fg: #0b5ea8; --status-repairing-bg: #e3f0fc; --status-repairing-border: #a3cbee;
+  --status-verifying-fg: #0a6b80; --status-verifying-bg: #dff3f7; --status-verifying-border: #9dd3de;
+  --status-recovery-verified-fg: #ffffff; --status-recovery-verified-bg: #0f6b3a; --status-recovery-verified-border: #0f6b3a;
+  --status-recovery-failed-fg: #8c1d18; --status-recovery-failed-bg: #fbe3e1; --status-recovery-failed-border: #e6a19c;
+  --status-needs-review-fg: #9a2a6e; --status-needs-review-bg: #fbe6f1; --status-needs-review-border: #e6a8cb;
+  --status-unknown-fg: #5f6a7d; --status-unknown-bg: #eef0f4; --status-unknown-border: #b8c0ce;
+  --status-blocked-by-policy-fg: #49556a; --status-blocked-by-policy-bg: #edf0f5; --status-blocked-by-policy-border: #c8cfdb;
+
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 40px; --space-12: 48px; --space-16: 64px;
+  --radius-4: 4px; --radius-6: 6px; --radius-8: 8px; --radius-12: 12px;
+  --shadow-1: 0 1px 2px rgb(18 24 38 / 6%);
+  --shadow-2: 0 4px 12px rgb(18 24 38 / 10%);
+  --shadow-3: 0 12px 32px rgb(18 24 38 / 16%);
+  --sidebar-width: 248px;
+  --header-height: 56px;
+  /* Additional interface and integration tokens */
+  --brand-aegis-text: #aeb9ff;
+  --overlay-dark-40: rgb(19 26 38 / 40%); --overlay-dark-35: rgb(19 26 38 / 35%);
+  --overlay-white-94: rgb(255 255 255 / 94%); --overlay-white-32: rgb(255 255 255 / 32%); --overlay-live-halo: rgb(53 211 154 / 12%);
+  --brand-mark-start: #8190ff; --brand-mark-end: #4855d7;
+  --sidebar-muted: #8f9bb1; --sidebar-section: #78839a; --sidebar-active-indicator: #8fa2ff;
+  --sidebar-icon: #96a1b7; --sidebar-icon-active: #b9c4ff; --sidebar-badge-bg: #432d42; --sidebar-badge-text: #ffb8ce;
+  --sidebar-footer-text: #758198; --sidebar-agent-muted: #8d9ab0; --sidebar-divider: #2b3344;
+  --live-dot: #35d39a; --attention-bg: #fffaf7; --table-divider-soft: #edf0f4;
+  --danger-button-bg: #fff7f6; --danger-button-text: #8c1d18; --danger-button-border: #e6a19c;
+  --warning-panel-bg: #fff9e5; --warning-panel-text: #71570b; --warning-panel-accent: #b38b11;
+  --brand-mark-text: #ffffff; --white-overlay: rgb(255 255 255 / 70%);
+  --integration-docker-bg: #e4f2fb; --integration-docker-text: #176a9e; --integration-docker-border: #bfdcee;
+  --integration-github-bg: #eff1f5; --integration-github-text: #273247; --integration-github-border: #d9dee7;
+  --integration-url-border: #d3dbff; --surface-planned: #fafbfd; --uptime-stripe: #f5cfcb;
+  --production-tag-bg: #39445a;
+
+}

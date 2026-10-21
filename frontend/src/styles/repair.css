@@ -1,0 +1,39 @@
+/* Level 2 · Codebase self-healing: repair journey, facts and the finding story. Shared design tokens only. */
+.repair-final{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:start;padding:12px 14px;margin-bottom:12px;border:1px solid var(--border);border-left:4px solid var(--border-strong,var(--border));border-radius:8px;background:var(--surface-2)}
+.repair-final p{margin:3px 0 0;font-size:12px;line-height:1.5;color:var(--text-secondary)}
+.repair-final strong{font-family:var(--font-display);font-size:15px}
+.repair-final.resolved{border-left-color:var(--status-healthy-fg);background:var(--status-healthy-bg)}
+.repair-final.repair_attempted,.repair-final.awaiting_approval{border-left-color:var(--status-verifying-fg);background:var(--status-verifying-bg)}
+.repair-final.validation_failed,.repair-final.verification_failed,.repair-final.blocked{border-left-color:var(--status-recovery-failed-fg);background:var(--status-recovery-failed-bg)}
+.repair-final.repairing{border-left-color:var(--status-repairing-fg);background:var(--status-repairing-bg)}
+.repair-facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.repair-fact{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 7px;align-items:center;padding:8px 10px;border:1px solid var(--border);border-radius:7px;background:var(--surface-1);font-size:11px}
+.repair-fact span{text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);font-size:10px}
+.repair-fact strong{grid-column:1 / -1;font-size:12px}
+.repair-fact.yes{border-color:var(--status-healthy-border)}.repair-fact.yes svg{color:var(--status-healthy-fg)}
+.repair-fact.no{border-color:var(--status-recovery-failed-border)}.repair-fact.no svg{color:var(--status-recovery-failed-fg)}
+.repair-fact.open svg{color:var(--text-muted)}
+.repair-journey{list-style:none;margin:0;padding:0;display:grid;gap:4px;counter-reset:step}
+.repair-journey li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:start;padding:7px 10px;border-radius:7px;border:1px solid transparent;background:var(--surface-2);font-size:12px}
+.repair-journey li>div{display:grid;gap:2px;min-width:0}
+.repair-journey li small{font-size:11px;color:var(--text-secondary);line-height:1.45;overflow-wrap:anywhere}
+.repair-journey li svg{margin-top:2px}
+.repair-journey li.done svg{color:var(--status-healthy-fg)}
+.repair-journey li.active{border-color:var(--status-repairing-border);background:var(--status-repairing-bg)}.repair-journey li.active svg{color:var(--status-repairing-fg)}
+.repair-journey li.waiting{border-color:var(--status-verifying-border);background:var(--status-verifying-bg)}.repair-journey li.waiting svg{color:var(--status-verifying-fg)}
+.repair-journey li.failed{border-color:var(--status-recovery-failed-border);background:var(--status-recovery-failed-bg)}.repair-journey li.failed svg{color:var(--status-recovery-failed-fg)}
+.repair-journey li.blocked svg{color:var(--status-warning-fg)}
+.repair-journey li.pending{color:var(--text-muted)}.repair-journey li.pending svg{color:var(--text-muted)}
+.repair-stage-word{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted)}
+.finding-story{display:grid;gap:10px}
+.finding-story-head{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.finding-story-head strong{font-family:var(--font-display);font-size:15px}
+.finding-story-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 16px;margin:0}
+.finding-story-grid dt{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted)}
+.finding-story-grid dd{margin:3px 0 0;font-size:12px;line-height:1.5;color:var(--text-secondary);overflow-wrap:anywhere}
+.finding-story-ids{margin-top:12px}
+@media (max-width:900px){.repair-facts{grid-template-columns:repeat(2,minmax(0,1fr))}.finding-story-grid{grid-template-columns:1fr}}
+@media (max-width:420px){.repair-facts{grid-template-columns:1fr}}
+.repair-approve-row{display:flex;justify-content:flex-end;margin-bottom:12px}
+.github-panel-anchor{scroll-margin-top:16px}
+.repair-approve-blocked{display:flex;gap:6px;align-items:center;color:var(--status-recovery-failed-fg)!important}

@@ -1,0 +1,117 @@
+server:
+  address: ${SERVER_ADDRESS:127.0.0.1}
+  port: ${PORT:8080}
+  shutdown: graceful
+spring:
+  application:
+    name: relay-aegis-api
+  datasource:
+    url: ${DATABASE_URL:jdbc:h2:mem:relayaegis;DB_CLOSE_DELAY=-1;MODE=PostgreSQL}
+    username: ${DATABASE_USERNAME:sa}
+    password: ${DATABASE_PASSWORD:}
+    driver-class-name: ${DATABASE_DRIVER:org.h2.Driver}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:update}
+    properties:
+      hibernate:
+        format_sql: false
+  flyway:
+    enabled: ${FLYWAY_ENABLED:false}
+  h2:
+    console:
+      enabled: ${H2_CONSOLE_ENABLED:false}
+  autoconfigure:
+    # Users authenticate through /api/auth with JWTs; Spring Boot's generated in-memory default user is not wanted.
+    exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when_authorized
+relay:
+  cors:
+    allowed-origins: ${RELAY_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
+  auth:
+    # HMAC-SHA256 secret for access tokens, at least 32 bytes. Blank = random per-process key (dev only).
+    jwt-secret: ${RELAY_AUTH_JWT_SECRET:}
+    issuer: ${RELAY_AUTH_JWT_ISSUER:relay-aegis}
+    audience: ${RELAY_AUTH_JWT_AUDIENCE:relay-aegis-web}
+    access-token-ttl: ${RELAY_AUTH_ACCESS_TOKEN_TTL:15m}
+    refresh-token-ttl: ${RELAY_AUTH_REFRESH_TOKEN_TTL:7d}
+    # auto = Secure flag when the request is HTTPS; set true behind a TLS-terminating proxy.
+    cookie-secure: ${RELAY_AUTH_COOKIE_SECURE:auto}
+    # Comma-separated emails that are granted ADMIN when they register; everyone else is USER.
+    admin-emails: ${RELAY_AUTH_ADMIN_EMAILS:}
+  monitoring:
+    interval-ms: ${RELAY_MONITORING_INTERVAL_MS:60000}
+    timeout-ms: ${RELAY_MONITORING_TIMEOUT_MS:2500}
+    # Consecutive failed checks before an incident opens, and consecutive healthy checks before it closes (1-10).
+    failure-threshold: ${RELAY_MONITORING_FAILURE_THRESHOLD:2}
+    recovery-threshold: ${RELAY_MONITORING_RECOVERY_THRESHOLD:2}
+    allowed-hosts: ${RELAY_MONITORING_ALLOWED_HOSTS:localhost,127.0.0.1,host.docker.internal,test-target}
+  recovery:
+    docker:
+      enabled: ${RELAY_RECOVERY_DOCKER_ENABLED:false}
+      allowed-containers: ${RELAY_DOCKER_ALLOWED_CONTAINERS:relay-aegis-test-target}
+      command: ${RELAY_DOCKER_COMMAND:docker}
+    # Recovery guard: attempts per incident, per-container cooldown, and a circuit breaker over failed recoveries.
+    max-attempts-per-incident: ${RELAY_RECOVERY_MAX_ATTEMPTS:2}
+    cooldown-seconds: ${RELAY_RECOVERY_COOLDOWN_SECONDS:60}
+    retry-backoff-ms: ${RELAY_RECOVERY_RETRY_BACKOFF_MS:5000}
+    circuit:
+      failure-threshold: ${RELAY_RECOVERY_CIRCUIT_FAILURES:3}
+      window-minutes: ${RELAY_RECOVERY_CIRCUIT_WINDOW_MINUTES:30}
+      open-minutes: ${RELAY_RECOVERY_CIRCUIT_OPEN_MINUTES:15}
+    # A recovery succeeds only after this many consecutive healthy checks within the timeout.
+    verification:
+      timeout-ms: ${RELAY_RECOVERY_VERIFICATION_TIMEOUT_MS:30000}
+      required-healthy-checks: ${RELAY_RECOVERY_VERIFICATION_HEALTHY_CHECKS:2}
+      poll-ms: 1000
+  docker:
+    # Containers that may be inspected (status, health, stats, logs) but never mutated, in addition to the recovery allowlist.
+    inspect-allowed-containers: ${RELAY_DOCKER_INSPECT_CONTAINERS:}
+    # Explicit dependency graph: app=dependency1|dependency2;other=dependency (Compose depends_on is also read).
+    dependencies: ${RELAY_DOCKER_DEPENDENCIES:}
+  sandbox:
+    # Patch validation in disposable Docker containers (build, tests, security re-scan). Off unless explicitly enabled.
+    enabled: ${RELAY_SANDBOX_ENABLED:false}
+    network: ${RELAY_SANDBOX_NETWORK:none}
+    memory: ${RELAY_SANDBOX_MEMORY:1g}
+    cpus: ${RELAY_SANDBOX_CPUS:1}
+    pids-limit: ${RELAY_SANDBOX_PIDS_LIMIT:256}
+    phase-timeout-seconds: ${RELAY_SANDBOX_PHASE_TIMEOUT_SECONDS:600}
+  ai:
+    gemini-api-key: ${GEMINI_API_KEY:}
+    gemini-model: ${GEMINI_MODEL:gemini-3.8-flash}
+    timeout-ms: ${RELAY_AI_TIMEOUT_MS:8000}
+    # Total budget for one Gemini generation call, retries and backoff included; keep below the proxy's 20 s read timeout.
+    generate-budget-ms: ${RELAY_AI_GENERATE_BUDGET_MS:18000}
+    # Background AI retries (2, 5, 15 min) for open incidents diagnosed by rules after a transient AI failure.
+    diagnosis-retry:
+      enabled: ${RELAY_AI_DIAGNOSIS_RETRY_ENABLED:true}
+      interval-ms: 60000
+  github:
+    token: ${GITHUB_TOKEN:}
+    # Apply/PR workflow. The token is used only server-side and is never stored, logged or returned.
+    # Needs a fine-grained token limited to the enabled repositories with Contents: read/write,
+    # Pull requests: read/write and Metadata: read. Blank = the workflow is unavailable.
+    remediation:
+      token: ${RELAY_GITHUB_TOKEN:}
+      # Explicit opt-in: comma-separated owner/name of repositories that may receive remediation pull requests.
+      repositories: ${RELAY_GITHUB_REMEDIATION_REPOSITORIES:}
+      # Emails (besides ADMIN users) allowed to apply remediations.
+      approvers: ${RELAY_GITHUB_REMEDIATION_APPROVERS:}
+      timeout-seconds: 20
+  assessment:
+    # Exact hostname allowlist; public hostnames must be explicitly added by the operator.
+    allowed-hosts: ${RELAY_ASSESSMENT_ALLOWED_HOSTS:localhost,127.0.0.1,test-target}
+logging:
+  level:
+    com.relayaegis: INFO

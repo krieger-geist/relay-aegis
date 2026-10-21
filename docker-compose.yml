@@ -1,0 +1,100 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: relay_aegis
+      POSTGRES_USER: relay
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-relay_dev_only}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - relay-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U relay -d relay_aegis"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  test-target:
+    build: ./test-target
+    container_name: relay-aegis-test-target
+    expose:
+      - "3000"
+    ports:
+      - "127.0.0.1:8091:3000"
+    restart: "no"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 3s
+
+  backend:
+    build: ./backend
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: postgres
+      SERVER_ADDRESS: 0.0.0.0
+      DATABASE_URL: jdbc:postgresql://db:5432/relay_aegis
+      DATABASE_USERNAME: relay
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-relay_dev_only}
+      JPA_DDL_AUTO: validate
+      FLYWAY_ENABLED: "true"
+      RELAY_RECOVERY_DOCKER_ENABLED: "true"
+      RELAY_DOCKER_ALLOWED_CONTAINERS: "${RELAY_DOCKER_ALLOWED_CONTAINERS:-relay-aegis-test-target}"
+      RELAY_DOCKER_INSPECT_CONTAINERS: "${RELAY_DOCKER_INSPECT_CONTAINERS:-}"
+      RELAY_DOCKER_DEPENDENCIES: "${RELAY_DOCKER_DEPENDENCIES:-}"
+      RELAY_RECOVERY_MAX_ATTEMPTS: "${RELAY_RECOVERY_MAX_ATTEMPTS:-2}"
+      RELAY_RECOVERY_COOLDOWN_SECONDS: "${RELAY_RECOVERY_COOLDOWN_SECONDS:-60}"
+      RELAY_SANDBOX_ENABLED: "${RELAY_SANDBOX_ENABLED:-false}"
+      RELAY_SANDBOX_NETWORK: "${RELAY_SANDBOX_NETWORK:-none}"
+      RELAY_MONITORING_ALLOWED_HOSTS: "${RELAY_MONITORING_ALLOWED_HOSTS:-test-target,localhost,127.0.0.1,host.docker.internal}"
+      RELAY_ASSESSMENT_ALLOWED_HOSTS: "${RELAY_ASSESSMENT_ALLOWED_HOSTS:-localhost,127.0.0.1,test-target}"
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
+      RELAY_AI_TIMEOUT_MS: "${RELAY_AI_TIMEOUT_MS:-8000}"
+      RELAY_AI_GENERATE_BUDGET_MS: "${RELAY_AI_GENERATE_BUDGET_MS:-18000}"
+      RELAY_MONITORING_INTERVAL_MS: "${RELAY_MONITORING_INTERVAL_MS:-60000}"
+      RELAY_RECOVERY_VERIFICATION_TIMEOUT_MS: "${RELAY_RECOVERY_VERIFICATION_TIMEOUT_MS:-30000}"
+      RELAY_MONITORING_TIMEOUT_MS: "${RELAY_MONITORING_TIMEOUT_MS:-2500}"
+      RELAY_MONITORING_FAILURE_THRESHOLD: "${RELAY_MONITORING_FAILURE_THRESHOLD:-2}"
+      RELAY_MONITORING_RECOVERY_THRESHOLD: "${RELAY_MONITORING_RECOVERY_THRESHOLD:-2}"
+      RELAY_CORS_ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      # Access-token signing secret (>= 32 bytes). Blank = random per-process key: sessions then survive restarts only via refresh.
+      RELAY_AUTH_JWT_SECRET: ${RELAY_AUTH_JWT_SECRET:-}
+      RELAY_AUTH_ACCESS_TOKEN_TTL: "${RELAY_AUTH_ACCESS_TOKEN_TTL:-15m}"
+      RELAY_AUTH_REFRESH_TOKEN_TTL: "${RELAY_AUTH_REFRESH_TOKEN_TTL:-7d}"
+      RELAY_AUTH_COOKIE_SECURE: "${RELAY_AUTH_COOKIE_SECURE:-auto}"
+      RELAY_AUTH_ADMIN_EMAILS: "${RELAY_AUTH_ADMIN_EMAILS:-}"
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      RELAY_GITHUB_TOKEN: ${RELAY_GITHUB_TOKEN:-}
+      RELAY_GITHUB_REMEDIATION_REPOSITORIES: "${RELAY_GITHUB_REMEDIATION_REPOSITORIES:-}"
+      RELAY_GITHUB_REMEDIATION_APPROVERS: "${RELAY_GITHUB_REMEDIATION_APPROVERS:-}"
+    depends_on:
+      db:
+        condition: service_healthy
+      test-target:
+        condition: service_healthy
+    volumes:
+      # Local test only: access to the Docker socket is highly privileged.
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/api/health || exit 1"]
+      interval: 10s
+      timeout: 4s
+      retries: 12
+      start_period: 25s
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "127.0.0.1:5173:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  relay-postgres-data:

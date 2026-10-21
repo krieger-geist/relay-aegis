@@ -1,0 +1,15 @@
+.env
+# Environment secrets
+.env.local
+.env.*.local
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+# Backend
+backend/target/
+# Local agent/workspace files
+.DS_Store
+Thumbs.db
+# TypeScript incremental build info
+*.tsbuildinfo
