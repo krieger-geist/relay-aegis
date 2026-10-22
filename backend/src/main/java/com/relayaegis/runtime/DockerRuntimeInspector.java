@@ -30,6 +30,8 @@ public class DockerRuntimeInspector {
     private static final Pattern REFUSED = Pattern.compile("(?i)(ECONNREFUSED|Connection refused|Connection to \\S+ refused)");
     private static final Pattern DNS = Pattern.compile("(?i)(ENOTFOUND|EAI_AGAIN|UnknownHostException|Name or service not known|getaddrinfo)");
     private static final Pattern TIMEOUT = Pattern.compile("(?i)(ETIMEDOUT|SocketTimeoutException|TimeoutException|\\btimed out\\b)");
+    /** A dependency (database, cache, broker) rejected the application's credentials. */
+    private static final Pattern AUTH_FAILURE = Pattern.compile("(?i)(password authentication failed|authentication failed for user|Access denied for user|Login failed for user|SASL authentication failed|WRONGPASS|NOAUTH Authentication required)");
     private static final Pattern PORT_IN_USE = Pattern.compile("(?i)(EADDRINUSE|Address already in use)");
     private static final Pattern FATAL = Pattern.compile("(?i)(\\bFATAL\\b|panic:|Unhandled|uncaughtException|\\bSegmentation fault\\b)");
     private static final Pattern EXCEPTION = Pattern.compile("(?:\\b[A-Z][A-Za-z0-9]*(?:Exception|Error)\\b|Traceback \\(most recent call last\\)|\\bERROR\\b)");
@@ -146,6 +148,7 @@ public class DockerRuntimeInspector {
             if (REFUSED.matcher(line).find()) signals.add(new LogExcerpt.LogSignal(LogExcerpt.LogSignal.Kind.CONNECTION_REFUSED, i, line, target(line)));
             if (DNS.matcher(line).find()) signals.add(new LogExcerpt.LogSignal(LogExcerpt.LogSignal.Kind.DNS_FAILURE, i, line, target(line)));
             if (TIMEOUT.matcher(line).find()) signals.add(new LogExcerpt.LogSignal(LogExcerpt.LogSignal.Kind.TIMEOUT, i, line, target(line)));
+            if (AUTH_FAILURE.matcher(line).find()) signals.add(new LogExcerpt.LogSignal(LogExcerpt.LogSignal.Kind.AUTH_FAILURE, i, line, null));
             if (PORT_IN_USE.matcher(line).find()) signals.add(new LogExcerpt.LogSignal(LogExcerpt.LogSignal.Kind.PORT_IN_USE, i, line, null));
             if (FATAL.matcher(line).find()) signals.add(new LogExcerpt.LogSignal(LogExcerpt.LogSignal.Kind.FATAL, i, line, null));
             else if (EXCEPTION.matcher(line).find()) signals.add(new LogExcerpt.LogSignal(LogExcerpt.LogSignal.Kind.EXCEPTION, i, line, null));

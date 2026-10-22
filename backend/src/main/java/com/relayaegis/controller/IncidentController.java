@@ -24,9 +24,18 @@ public class IncidentController {
     private final MonitoringService monitoring;
     private final com.relayaegis.findings.IncidentFindingService findings;
     private final com.relayaegis.repair.RepairOrchestrator repairs;
+    private final com.relayaegis.service.IncidentCodeLinkService codeLinks;
     public IncidentController(IncidentService incidents, RecoveryOrchestrationService recovery, DiagnosisService diagnosis,
-            MonitoringService monitoring, com.relayaegis.findings.IncidentFindingService findings, com.relayaegis.repair.RepairOrchestrator repairs) {
+            MonitoringService monitoring, com.relayaegis.findings.IncidentFindingService findings, com.relayaegis.repair.RepairOrchestrator repairs,
+            com.relayaegis.service.IncidentCodeLinkService codeLinks) {
         this.incidents=incidents; this.recovery=recovery; this.diagnosis=diagnosis; this.monitoring=monitoring; this.findings=findings; this.repairs=repairs;
+        this.codeLinks=codeLinks;
+    }
+
+    /** Read-only: the Code finding that can fix this incident's root cause, when the cause is outside the runtime. */
+    @GetMapping("/{id}/code-link")
+    public ApiEnvelope<com.relayaegis.service.IncidentCodeLinkService.CodeLinkDto> codeLink(@PathVariable String id) {
+        return ApiEnvelope.of(codeLinks.link(id), "live");
     }
     /** Auto-Repair for an incident: the existing policy check, recovery and health verification. */
     @PostMapping("/{id}/auto-repair")

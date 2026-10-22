@@ -40,6 +40,15 @@ paths:
       responses:
         '200': {description: OK}
         '401': {description: Missing or invalid access token}
+  /api/incidents/{id}/code-link:
+    get:
+      summary: Read-only link from a Runtime incident whose root cause is in code to the Code finding that can fix it
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200': {description: "status (LINKED, NOT_ASSESSED, NO_FINDING, NO_REPOSITORY, NOT_APPLICABLE), repository, assessmentId, findings"}
+        '401': {description: Missing or invalid access token}
+        '404': {description: Unknown incident}
   /api/metrics/levels:
     get:
       summary: Level 2 (codebase) and Level 3 (live URL) counts from stored records

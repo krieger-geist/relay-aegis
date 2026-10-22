@@ -25,6 +25,7 @@ export function failureClass(incident: Incident, runtime?: SystemRuntime | null)
   let label = 'Not yet classified';
   if (top) {
     if (top.patternId === 'dependency-network-detached') label = 'Network partition · dependency unreachable';
+    else if (top.patternId === 'dependency-credentials-rejected') label = 'Credentials rejected · root cause outside the runtime';
     else if (top.category === 'dependency') label = 'Dependency failure';
     else if (CONTAINER_PATTERNS.includes(top.patternId)) label = 'Container / process failure';
     else if (top.patternId === 'port-not-listening') label = 'Process running, not serving';

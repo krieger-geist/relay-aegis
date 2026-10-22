@@ -22,6 +22,6 @@ public record LogExcerpt(String container, boolean available, String unavailable
 
     /** A log line that matched a known failure signature. {@code target} is e.g. "db:5432" for connection errors. */
     public record LogSignal(Kind kind, int lineIndex, String line, String target) {
-        public enum Kind { OOM, CONNECTION_REFUSED, DNS_FAILURE, TIMEOUT, PORT_IN_USE, FATAL, EXCEPTION, LISTENING }
+        public enum Kind { OOM, CONNECTION_REFUSED, DNS_FAILURE, TIMEOUT, PORT_IN_USE, FATAL, EXCEPTION, LISTENING, AUTH_FAILURE }
     }
 }

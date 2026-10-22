@@ -63,7 +63,7 @@ function DetailsLink({ link }: { link: string }) {
  * Opens the existing Level 2 Code Repair Journey (/repairs/:id) for a finding's code repair. The repair id comes from the
  * backend's own details link when it points into RELAY, otherwise from the recorded repairs of this assessment finding.
  */
-function RepairJourneyLink({ assessmentId, findingId, detailsLink }: { assessmentId: string; findingId: string; detailsLink?: string | null }) {
+export function RepairJourneyLink({ assessmentId, findingId, detailsLink }: { assessmentId: string; findingId: string; detailsLink?: string | null }) {
   const direct = detailsLink?.startsWith('/repairs/') ? detailsLink : null;
   const repairs = useQuery({ queryKey: ['repairs'], queryFn: () => apiGet<RepairJob[]>('/api/repairs'), enabled: !direct, retry: false });
   const job = (Array.isArray(repairs.data?.data) ? repairs.data.data : []).filter((item) => item.assessmentId === assessmentId && item.findingId === findingId)

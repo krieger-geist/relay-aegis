@@ -161,6 +161,8 @@ public class EvidenceCorrelationEngine {
             case "http-5xx", "container-crashed", "crash-loop" -> title.contains("exception") || title.contains("error handling") || title.contains("empty")
                     || title.contains("sql") || title.contains("null");
             case "oom-killed" -> title.contains("memory") || title.contains("unbounded");
+            // A dependency rejecting the app's credentials, and a credential hard-coded in the app's source.
+            case "dependency-credentials-rejected" -> title.contains("credential") || title.contains("secret") || title.contains("password");
             default -> false;
         };
     }

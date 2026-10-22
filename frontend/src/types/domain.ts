@@ -306,6 +306,11 @@ export interface CertificateEvidence {
 export interface LiveChange { aspect: string; before: string; after: string; significance: 'notable' | 'minor'; note: string | null }
 /** GET /api/assessments/{id}/live: the run's observation and what changed since the previous run of the same URL. */
 export interface LiveInsight { observation: LiveObservation | null; comparison: 'COMPARED' | 'FIRST_RUN' | 'NOT_RECORDED'; previousId: string | null; previousAt: string | null; changes: LiveChange[] }
+/** GET /api/incidents/{id}/code-link: the Code finding behind a runtime incident whose cause is in the code (read-only). */
+export interface IncidentCodeLink {
+  status: 'LINKED' | 'NOT_ASSESSED' | 'NO_FINDING' | 'NO_REPOSITORY' | 'NOT_APPLICABLE'; reason: string; repository: string | null;
+  assessmentId: string | null; assessedAt: string | null; commit: string | null; findings: { findingId: string; title: string; file: string | null; line: number | null }[];
+}
 /** GET /api/assessments/target-policy: which live URL targets may be investigated. */
 export interface TargetPolicy { allowPublicHosts: boolean; allowedHosts: string[] }
 export type AssessmentRunStatus = 'queued' | 'running' | 'completed' | 'failed';

@@ -437,3 +437,18 @@ code, pre, .mono { font-family: var(--font-mono); }
 .hypothesis-more[open] > summary { border-bottom: 1px solid var(--border); }
 .hypothesis-more > ol { margin: 10px 12px 12px; }
 @media (max-width: 767px) { .panel-header { flex-wrap: wrap; gap: 8px; } .panel-actions { flex-wrap: wrap; } }
+/* Runtime incident whose root cause is in the code */
+.code-root-cause { display: grid; gap: 10px; margin-top: 14px; padding: 14px 16px; border: 1px solid var(--border); border-left: 3px solid var(--brand-600); border-radius: 10px; background: var(--surface-1); }
+.code-root-cause header { display: flex; align-items: center; gap: 8px; color: var(--brand-600); }
+.code-root-cause header strong { font-family: var(--font-display); font-size: 14px; color: var(--text-primary); }
+.code-root-tag { margin-left: auto; padding: 1px 7px; border-radius: 5px; border: 1px solid currentColor; font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; }
+.code-root-why { margin: 0; font-size: 12.5px; color: var(--text-secondary); }
+.code-root-finding { display: grid; gap: 8px; }
+.code-root-finding > div:not(.code-root-actions) { display: grid; grid-template-columns: 110px minmax(0,1fr); gap: 2px 10px; font-size: 12.5px; align-items: baseline; }
+.code-root-finding > div > span:not(.code-root-label), .code-root-finding > div > b + span { grid-column: 2; color: var(--text-secondary); overflow-wrap: anywhere; }
+.code-root-label { grid-row: span 2; font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); }
+.code-root-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.code-root-outcome { display: flex; gap: 8px; align-items: flex-start; margin: 0; padding: 9px 11px; border-radius: 8px; font-size: 12.5px; }
+.code-root-outcome.done { background: var(--status-healthy-bg); color: var(--status-healthy-fg); border: 1px solid var(--status-healthy-border); }
+.code-root-outcome.partial { background: var(--status-verifying-bg); color: var(--text-primary); border: 1px solid var(--status-verifying-border); }
+@media (max-width: 640px) { .code-root-finding > div:not(.code-root-actions) { grid-template-columns: minmax(0,1fr); } .code-root-label { grid-row: auto; } .code-root-finding > div > span:not(.code-root-label), .code-root-finding > div > b + span { grid-column: 1; } }

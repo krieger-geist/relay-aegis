@@ -5,6 +5,7 @@ import com.relayaegis.diagnostics.patterns.ApplicationTimeoutPattern;
 import com.relayaegis.diagnostics.patterns.ConnectionRefusedPattern;
 import com.relayaegis.diagnostics.patterns.ContainerExitedPattern;
 import com.relayaegis.diagnostics.patterns.CrashLoopPattern;
+import com.relayaegis.diagnostics.patterns.DependencyCredentialsRejectedPattern;
 import com.relayaegis.diagnostics.patterns.DependencyNetworkDetachedPattern;
 import com.relayaegis.diagnostics.patterns.DependencyRecoveredPattern;
 import com.relayaegis.diagnostics.patterns.DependencyUnavailablePattern;
@@ -52,6 +53,7 @@ public class FailurePatternRegistry {
                 new DependencyUnavailablePattern(),
                 new DependencyRecoveredPattern(),
                 new DependencyNetworkDetachedPattern(),
+                new DependencyCredentialsRejectedPattern(),
                 new NetworkFailurePatterns.DnsFailurePattern(),
                 new NetworkFailurePatterns.TcpConnectTimeoutPattern(),
                 new NetworkFailurePatterns.TlsFailurePattern(),

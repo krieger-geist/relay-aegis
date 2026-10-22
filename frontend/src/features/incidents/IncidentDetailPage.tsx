@@ -12,6 +12,7 @@ import { useAcknowledgeIncidents } from '@/lib/incidentNotifications';
 import { recoveryRecords } from '@/lib/diagnosisEngine';
 import { recommendedNextStep } from '@/lib/incidentGuidance';
 import { resolutionNotice } from '@/lib/resolutionProgress';
+import { CodeRootCause } from './CodeRootCause';
 import { DiagnosisPanel } from './DiagnosisPanel';
 import type { Diagnosis, Incident, ResolutionProgress } from '@/types/domain';
 
@@ -64,6 +65,7 @@ export function IncidentDetailPage() {
       </div>
       <aside className="incident-context-column">
         <DiagnosisPanel incident={item} diagnosis={diagnose.data?.data ?? item.diagnosis} onAnalyse={() => diagnose.mutate()} pending={diagnose.isPending} error={diagnose.isError ? diagnose.error.message : undefined} />
+        <CodeRootCause incident={item} />
         <Panel title="Recommended action" subtitle="The policy engine must approve every action" provenance={item.provenance}>
           <div className="recommended-action"><div className="recommended-icon"><Search size={16} /></div><div><div className="recommended-title">{recommendation.title}</div><div className="recommended-detail">{recommendation.detail}</div></div></div>
           {hasDockerRunbook ? <div className="policy-indicator"><LockKeyhole size={13} /><span>Backend policy and the configured container allowlist are checked before execution.</span></div> : <div className="warning-box"><LockKeyhole size={13} /> No approved automatic recovery runbook is configured for this component.</div>}

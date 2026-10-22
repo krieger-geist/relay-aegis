@@ -7,6 +7,7 @@ import { apiGet, apiPost } from '@/lib/api/client';
 import { RepairProgressPanel } from '@/features/assessments/AssessmentDiagnosis';
 import type { Application, Hypothesis, Incident, RepairProgress, RuntimeState, StatusKey, SystemRuntime } from '@/types/domain';
 import { failureClass, topHypothesis } from './systemIncidents';
+import { CodeRootCause } from '@/features/incidents/CodeRootCause';
 import '@/styles/assessment.css';
 import '@/styles/system.css';
 
@@ -30,7 +31,7 @@ function HealthTile({ icon: Icon, label, value, detail, tone }: { icon: typeof S
 const runtimeTone: Record<RuntimeState, Tone> = { healthy: 'ok', starting: 'warn', unhealthy: 'bad', stopped: 'bad', restarting: 'bad', missing: 'bad', detached: 'bad', not_observable: 'unknown' };
 const toneRank: Record<Tone, number> = { bad: 3, warn: 2, unknown: 1, ok: 0 };
 const signalLabel: Record<string, string> = {
-  CONNECTION_REFUSED: 'connection refused', DNS_FAILURE: 'unknown host', TIMEOUT: 'timeout', OOM: 'out of memory', PORT_IN_USE: 'port in use', FATAL: 'fatal error', EXCEPTION: 'exception',
+  CONNECTION_REFUSED: 'connection refused', AUTH_FAILURE: 'credentials rejected', DNS_FAILURE: 'unknown host', TIMEOUT: 'timeout', OOM: 'out of memory', PORT_IN_USE: 'port in use', FATAL: 'fatal error', EXCEPTION: 'exception',
 };
 
 /**
@@ -197,5 +198,6 @@ export function SystemIncidentPanel({ incident, runtime, onChanged }: { incident
         <Link className="small-link" to={`/incidents/${incident.id}`}>Open full investigation <ChevronRight size={12} /></Link>
       </div>
     </div>
+    <CodeRootCause incident={incident} />
   </section>;
 }
