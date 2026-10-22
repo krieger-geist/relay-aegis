@@ -53,6 +53,7 @@ public final class LiveChanges {
         if (!Objects.equals(before.certIssuer(), after.certIssuer()) && before.certIssuer() != null && after.certIssuer() != null) {
             out.add(new Change("Certificate issuer", before.certIssuer(), after.certIssuer(), "notable", null));
         }
+        certificateChanges(before.certificate(), after.certificate(), out);
         Set<String> bHeaders = new TreeSet<>(before.headers()), aHeaders = new TreeSet<>(after.headers());
         for (String header : LiveObservation.TRACKED_HEADERS) {
             boolean had = bHeaders.contains(header), has = aHeaders.contains(header);
@@ -75,6 +76,25 @@ public final class LiveChanges {
                     "CDNs and load balancers rotate addresses; informational unless other layers changed too"));
         }
         return out;
+    }
+
+    /** Only when both runs observed a certificate: a different certificate, or a changed host-name or chain result. */
+    static void certificateChanges(CertificateEvidence before, CertificateEvidence after, List<Change> out) {
+        if (before == null || after == null || !CertificateEvidence.OBSERVED.equals(before.status()) || !CertificateEvidence.OBSERVED.equals(after.status())) return;
+        if (before.sha256Fingerprint() != null && after.sha256Fingerprint() != null && !before.sha256Fingerprint().equals(after.sha256Fingerprint())) {
+            out.add(new Change("Certificate", shortFingerprint(before.sha256Fingerprint()), shortFingerprint(after.sha256Fingerprint()), "minor",
+                    "a different certificate was presented (SHA-256 fingerprint)"));
+        }
+        if (before.hostnameMatch() != null && after.hostnameMatch() != null && !before.hostnameMatch().result().equals(after.hostnameMatch().result())) {
+            out.add(new Change("Certificate host-name match", before.hostnameMatch().result(), after.hostnameMatch().result(), "notable", after.hostnameMatch().detail()));
+        }
+        if (before.chainValidation() != null && after.chainValidation() != null && !before.chainValidation().result().equals(after.chainValidation().result())) {
+            out.add(new Change("Certificate chain validation", before.chainValidation().result(), after.chainValidation().result(), "notable", after.chainValidation().detail()));
+        }
+    }
+
+    private static String shortFingerprint(String fingerprint) {
+        return fingerprint.length() > 23 ? fingerprint.substring(0, 23) + "…" : fingerprint;
     }
 
     static String outcomes(LiveObservation observation) {

@@ -22,7 +22,7 @@ class LiveChangesTest {
         }
         return new LiveObservation(1, "https://site.test/", Instant.parse("2026-10-21T08:00:00Z"), addresses, 3L, 20L, 40L, "TLSv1.3", "TLS_AES_128_GCM_SHA256",
                 certNotAfter, "Example CA", Map.of("DNS", "PASSED", "TCP", "PASSED", "TLS", "PASSED", "HTTP", statuses.contains(200) ? "PASSED" : "FAILED"),
-                samples, redirect, "nginx", "text/html", headers, 200);
+                samples, redirect, "nginx", "text/html", headers, 200, null);
     }
 
     static LiveObservation baseline() {
@@ -75,5 +75,30 @@ class LiveChangesTest {
         var changes = LiveChanges.compare(baseline(), observation(Arrays.asList(null, null, null), 0, List.of(), CERT, null, List.of("1.1.1.1")));
         assertTrue(changes.stream().noneMatch(c -> c.aspect().startsWith("Header")));
         assertTrue(changes.stream().anyMatch(c -> c.aspect().equals("Response status") && c.after().equals("no response, no response, no response")));
+    }
+
+    static CertificateEvidence cert(String fingerprint, String hostname, String chain) {
+        return new CertificateEvidence(CertificateEvidence.OBSERVED, null, "site.test", null, List.of("DNS:site.test"), "Example CA", null,
+                CERT.minusSeconds(86_400 * 60L), CERT, 40L, "0A", fingerprint, "SHA256withECDSA", "EC 256", List.of(), "TLSv1.3", "TLS_AES_128_GCM_SHA256",
+                new CertificateEvidence.Check(hostname, "detail"), new CertificateEvidence.Check(chain, "chain detail"));
+    }
+
+    static LiveObservation withCertificate(CertificateEvidence certificate) {
+        LiveObservation b = baseline();
+        return new LiveObservation(b.version(), b.url(), b.observedAt(), b.addresses(), b.dnsMs(), b.tcpMs(), b.tlsMs(), b.tlsProtocol(), b.tlsCipher(), b.certNotAfter(),
+                b.certIssuer(), b.layers(), b.samples(), b.redirectLocation(), b.server(), b.contentType(), b.headers(), b.rootStatus(), certificate);
+    }
+
+    @Test
+    void certificateReplacementHostNameAndTrustChangesAreReported() {
+        String a = "AA:".repeat(31) + "AA", b = "BB:".repeat(31) + "BB";
+        assertTrue(LiveChanges.compare(withCertificate(cert(a, "PASS", "PASS")), withCertificate(cert(a, "PASS", "PASS"))).isEmpty());
+        var changes = LiveChanges.compare(withCertificate(cert(a, "PASS", "PASS")), withCertificate(cert(b, "FAIL", "FAIL")));
+        assertTrue(changes.stream().anyMatch(c -> c.aspect().equals("Certificate") && c.significance().equals("minor") && c.after().startsWith("BB:BB")));
+        assertTrue(changes.stream().anyMatch(c -> c.aspect().equals("Certificate host-name match") && c.before().equals("PASS") && c.after().equals("FAIL") && c.significance().equals("notable")));
+        assertTrue(changes.stream().anyMatch(c -> c.aspect().equals("Certificate chain validation") && c.after().equals("FAIL")));
+        // Nothing is compared when either run did not observe a certificate.
+        assertTrue(LiveChanges.compare(withCertificate(CertificateEvidence.notTested("plain")), withCertificate(cert(b, "FAIL", "FAIL"))).stream()
+                .noneMatch(c -> c.aspect().startsWith("Certificate")));
     }
 }

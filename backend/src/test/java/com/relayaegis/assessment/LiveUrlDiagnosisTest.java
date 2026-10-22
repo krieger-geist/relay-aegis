@@ -192,6 +192,9 @@ class LiveUrlDiagnosisTest {
         assertEquals(200, observation.rootStatus());
         assertTrue(observation.tcpMs() != null && observation.dnsMs() != null);
         assertTrue(observation.headers().isEmpty());
+        assertEquals(CertificateEvidence.NOT_TESTED, observation.certificate().status());
+        assertTrue(observation.certificate().reason().startsWith("Plain HTTP"));
+        assertEquals("NOT_TESTED", observation.certificate().hostnameMatch().result());
     }
 
     @Test
@@ -201,5 +204,6 @@ class LiveUrlDiagnosisTest {
         assertEquals("NOT_TESTED", observation.layers().get("TCP"));
         assertEquals("NOT_TESTED", observation.layers().get("HTTP"));
         assertTrue(observation.samples().isEmpty());
+        assertEquals(CertificateEvidence.NOT_TESTED, observation.certificate().status());
     }
 }

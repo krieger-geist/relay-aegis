@@ -271,3 +271,29 @@
 .timing-legend i{width:10px;height:10px;border-radius:2px}
 .timing-note{margin:0;font-size:11.5px;line-height:1.5;color:var(--text-muted)}
 @media (max-width:640px){.timing-rows li{grid-template-columns:minmax(0,1fr) 56px}.timing-bar{grid-column:1/-1;grid-row:2}}
+
+/* Live URL: certificate evidence under the TLS step */
+.live-step-extra{grid-column:2/-1;min-width:0}
+.cert-details{border:1px solid var(--border);border-radius:8px;background:var(--surface-1)}
+.cert-details>summary{cursor:pointer;padding:6px 10px;font-size:12px;font-weight:600;color:var(--text-secondary);overflow-wrap:anywhere}
+.cert-details[open]>summary{border-bottom:1px solid var(--border)}
+.cert-reason{margin:0;padding:8px 10px;font-size:12px;color:var(--text-muted)}
+.cert-columns{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:14px;padding:10px 12px}
+.cert-columns h4{margin:0 0 6px;font-family:var(--font-mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted)}
+.cert-columns h5{margin:10px 0 4px;font-size:11px;color:var(--text-secondary)}
+.cert-columns dl{margin:0;display:grid;gap:4px}
+.cert-columns dl div{display:grid;grid-template-columns:minmax(0,150px) minmax(0,1fr);gap:8px;font-size:12px}
+.cert-columns dt{color:var(--text-muted)}
+.cert-columns dd{margin:0;color:var(--text-primary);overflow-wrap:anywhere}
+.cert-columns dd.mono{font-family:var(--font-mono);font-size:11px}
+.cert-chain{margin:0;padding-left:18px;display:grid;gap:3px;font-size:12px}
+.cert-chain small{display:block;color:var(--text-muted)}
+.cert-checks{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.cert-checks li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 8px;padding:7px 9px;border:1px solid var(--border);border-radius:7px;font-size:12px}
+.cert-checks small{grid-column:1/-1;color:var(--text-muted);overflow-wrap:anywhere}
+.cert-result{font-weight:600}
+.cert-checks li.pass .cert-result{color:var(--status-healthy-fg)}
+.cert-checks li.fail .cert-result{color:var(--status-recovery-failed-fg)}
+.cert-checks li.warn .cert-result{color:var(--status-verifying-fg)}
+.cert-checks li.not_tested .cert-result,.cert-checks li.none .cert-result{color:var(--text-muted)}
+@media (max-width:760px){.cert-columns{grid-template-columns:minmax(0,1fr)}.cert-columns dl div{grid-template-columns:minmax(0,1fr)}}

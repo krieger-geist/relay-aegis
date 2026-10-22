@@ -291,6 +291,17 @@ export interface LiveObservation {
   tlsProtocol: string | null; tlsCipher: string | null; certNotAfter: string | null; certIssuer: string | null;
   layers: Record<string, 'PASSED' | 'FAILED' | 'NOT_TESTED' | 'NOT_APPLICABLE'>; samples: LiveSample[];
   redirectLocation: string | null; server: string | null; contentType: string | null; headers: string[]; rootStatus: number | null;
+  /** Null for runs recorded before certificate evidence existed. */
+  certificate?: CertificateEvidence | null;
+}
+/** The certificate presented on the Live URL TLS connection; public data only. */
+export interface CertificateCheck { result: 'PASS' | 'FAIL' | 'NOT_TESTED'; detail: string }
+export interface CertificateEvidence {
+  status: 'OBSERVED' | 'NOT_TESTED' | 'UNAVAILABLE'; reason: string | null; subjectCommonName: string | null; subjectOrganization: string | null;
+  subjectAltNames: string[]; issuerCommonName: string | null; issuerOrganization: string | null; notBefore: string | null; notAfter: string | null;
+  daysRemaining: number | null; serialNumber: string | null; sha256Fingerprint: string | null; signatureAlgorithm: string | null; publicKey: string | null;
+  chain: { position: number; subject: string | null; issuer: string | null; notAfter: string | null; selfSigned: boolean }[];
+  tlsVersion: string | null; cipherSuite: string | null; hostnameMatch: CertificateCheck; chainValidation: CertificateCheck;
 }
 export interface LiveChange { aspect: string; before: string; after: string; significance: 'notable' | 'minor'; note: string | null }
 /** GET /api/assessments/{id}/live: the run's observation and what changed since the previous run of the same URL. */

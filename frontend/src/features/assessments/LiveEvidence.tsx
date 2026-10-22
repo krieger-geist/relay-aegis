@@ -1,5 +1,6 @@
 import { AlertTriangle, CheckCircle2, CircleHelp, Globe, MinusCircle, XCircle } from 'lucide-react';
-import type { Assessment, AssessmentCheck, AssessmentDiagnosis, CanonicalFinding, Certainty, LayerStatus } from '@/types/domain';
+import type { Assessment, AssessmentCheck, AssessmentDiagnosis, CanonicalFinding, CertificateEvidence, Certainty, LayerStatus } from '@/types/domain';
+import { CertificateDetails } from './CertificateDetails';
 
 /**
  * Level 3 evidence, exactly as recorded: the URL, then DNS → TCP → TLS → HTTP with each layer's own observation, then the
@@ -22,7 +23,7 @@ const patternWord: Record<string, string> = {
   PERSISTENT: 'Persistent failure', INTERMITTENT: 'Intermittent', RECOVERED: 'Recovered', STABLE: 'Stable', SINGLE_OBSERVATION: 'Single sample', NOT_SAMPLED: 'Not sampled',
 };
 
-export function LiveEvidencePath({ assessment }: { assessment: Assessment }) {
+export function LiveEvidencePath({ assessment, certificate }: { assessment: Assessment; certificate?: CertificateEvidence | null }) {
   const diagnosis = assessment.diagnosis;
   const layers = (diagnosis?.layers ?? []).filter((layer) => ['DNS', 'TCP', 'TLS', 'HTTP'].includes(layer.layer));
   const observations = OBSERVATIONS.map((name) => assessment.checks.find((check) => check.name === name)).filter((check): check is AssessmentCheck => Boolean(check));
@@ -35,6 +36,7 @@ export function LiveEvidencePath({ assessment }: { assessment: Assessment }) {
           const notApplicable = layer.status === 'NOT_TESTED' && layer.detail.startsWith('Not applicable');
           return <li key={layer.layer} className={`live-step ${layer.status.toLowerCase()}`}>
             <LayerIcon status={layer.status} /><div><strong>{layer.layer}</strong><span>{layer.detail}</span></div><em>{notApplicable ? 'Not applicable' : layerWord[layer.status]}</em>
+            {layer.layer === 'TLS' && certificate ? <div className="live-step-extra"><CertificateDetails certificate={certificate} /></div> : null}
           </li>;
         })}
     </ol>

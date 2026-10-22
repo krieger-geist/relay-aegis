@@ -230,7 +230,7 @@ export function AssessmentsPage({ level }: { level: InvestigationLevel }) {
           <Panel title="What changed since the last run" subtitle="Differences between this run and the previous run of the same URL" provenance={selected.provenance}>
             {insight ? <LiveChanges insight={insight} /> : <p className="live-empty">{liveInsight.isError ? 'The comparison could not be loaded.' : 'Comparing with the previous run…'}</p>}
           </Panel>
-          <Panel title="Evidence" subtitle="What RELAY observed, layer by layer" provenance={selected.provenance}><LiveEvidencePath assessment={selected} /></Panel>
+          <Panel title="Evidence" subtitle="What RELAY observed, layer by layer" provenance={selected.provenance}><LiveEvidencePath assessment={selected} certificate={insight?.observation?.certificate} /></Panel>
           <Panel title="Where the time goes" subtitle="Connection setup, waiting for the server and downloading, per request" provenance={selected.provenance}>
             {insight?.observation ? <TimingBreakdown observation={insight.observation} /> : <p className="live-empty">{insight ? 'This run predates timing capture; run the URL again to see the breakdown.' : liveInsight.isError ? 'Timing could not be loaded.' : 'Loading timing…'}</p>}
           </Panel>

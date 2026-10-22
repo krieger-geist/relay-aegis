@@ -32,7 +32,7 @@ class LiveInsightServiceTest {
         if (status != null) {
             run.setLiveObservationJson(mapper.writeValueAsString(new LiveObservation(1, url, at, List.of("1.1.1.1"), 3L, 10L, null, null, null, null, null,
                     Map.of("DNS", "PASSED", "TCP", "PASSED", "TLS", "NOT_APPLICABLE", "HTTP", status < 500 ? "PASSED" : "FAILED"),
-                    List.of(new LiveObservation.Sample(1, status, 120L, 4L, 50L, false, null)), null, "nginx", "text/html", List.of(), 200)));
+                    List.of(new LiveObservation.Sample(1, status, 120L, 4L, 50L, false, null)), null, "nginx", "text/html", List.of(), 200, null)));
         }
         return run;
     }
