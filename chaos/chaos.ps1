@@ -81,9 +81,9 @@ function Invoke-Inject($name) {
         'stop-db'        { Invoke-Docker stop sba-postgres | Out-Null }
         'block-db'       { Invoke-Docker network disconnect $SbaNetwork sba-postgres | Out-Null }
         'corrupt-record' {
-            $owner = Invoke-SbaSql "select id from users order by created_at limit 1"
-            Invoke-SbaSql ("insert into orders (owner_id, order_number, status, total_amount, notes) values " +
-                "('$owner', '$ChaosOrder', 'C0RRUPT', 0, 'Inserted by chaos.ps1; removed by reset') " +
+            # One marked order per account, so whichever account is signed in sees the broken Orders page.
+            Invoke-SbaSql ("insert into orders (owner_id, order_number, status, total_amount, notes) " +
+                "select id, '$ChaosOrder', 'C0RRUPT', 0, 'Inserted by chaos.ps1; removed by reset' from users " +
                 "on conflict (owner_id, order_number) do nothing") | Out-Null
         }
         'flood' {
