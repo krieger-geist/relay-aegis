@@ -16,6 +16,7 @@
   .\chaos.ps1 stop-backend
   .\chaos.ps1 measure stop-backend -Healing on
   .\chaos.ps1 reset
+  .\chaos.ps1 ready      (waits until it is safe to inject the next failure)
 #>
 param(
     [Parameter(Position = 0)][string]$Command = 'help',
@@ -138,6 +139,30 @@ function Get-RelayIncident($appName, [datetime]$since) {
     @{ id = $p[0]; status = $p[1]; detectMs = [long]$p[2]; recoverMs = [long]$p[3]; detectedAt = $p[4]; recoveredAt = $p[5] }
 }
 
+function Invoke-RelaySql($sql) {
+    $user = (& docker exec relay-aegis-db-1 printenv POSTGRES_USER).Trim()
+    $db = (& docker exec relay-aegis-db-1 printenv POSTGRES_DB).Trim()
+    & docker exec relay-aegis-db-1 psql -U $user -d $db -tAc $sql 2>$null
+}
+
+function Wait-Ready {
+    # Safe to inject the next failure when SBA is healthy, RELAY has closed its last SBA incident, and the per-container
+    # recovery cooldown (60 s after RELAY's last action) has passed.
+    Write-Step 'Waiting until it is safe to inject the next failure...'
+    while (-not (Test-Health $BackendHealth).ok) { Start-Sleep -Seconds 2 }
+    Write-Step 'Backend healthy.'
+    $openSql = "select count(*) from incidents where application_name like 'Smart Business AI Assistant%Backend' " +
+               "and status not in ('resolved','recovery_verified','closed','recovered')"
+    while ([int](Invoke-RelaySql $openSql) -gt 0) { Start-Sleep -Seconds 2 }
+    Write-Step 'No open RELAY incident.'
+    $since = Invoke-RelaySql ("select coalesce(extract(epoch from now() - max(occurred_at))::int, 9999) from recovery_events " +
+                              "where application_name like 'Smart Business AI Assistant%Backend'")
+    $left = 65 - [int]$since
+    while ($left -gt 0) { Write-Host -NoNewline ("`r  recovery cooldown: {0,2} s " -f $left); Start-Sleep -Seconds 1; $left-- }
+    Write-Host ''
+    Write-Host 'READY - inject the next failure' -ForegroundColor Green
+}
+
 function Invoke-Measure($name) {
     if (-not $Failures.Contains($name)) { throw "Unknown failure '$name'. Run .\chaos.ps1 list" }
     $url = if ($name -eq 'rotate-password') { $OrdersHealth } else { $BackendHealth }
@@ -196,6 +221,7 @@ switch ($Command) {
     'list'    { $Failures.GetEnumerator() | ForEach-Object { '{0,-16} {1}' -f $_.Key, $_.Value } }
     'status'  { Show-Status }
     'reset'   { Invoke-Reset }
+    'ready'   { Wait-Ready }
     'measure' { Invoke-Measure $Failure }
     'help'    { Get-Help $PSCommandPath -Detailed }
     default   { if ($Failures.Contains($Command)) { Invoke-Inject $Command } else { throw "Unknown command '$Command'. Run .\chaos.ps1 list" } }

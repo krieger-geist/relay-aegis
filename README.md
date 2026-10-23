@@ -117,6 +117,7 @@ cd chaos
 .\chaos.ps1 stop-db                               # inject one failure
 .\chaos.ps1 measure stop-db -Healing on           # inject, time it, record it
 .\chaos.ps1 reset                                 # put everything back
+.\chaos.ps1 ready                                 # wait until it is safe to inject the next failure
 ```
 
 | Failure | What it does |
