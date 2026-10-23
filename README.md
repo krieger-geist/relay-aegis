@@ -104,6 +104,43 @@ Key settings in `.env` (see `.env.example` for all of them):
 
 ---
 
+## Chaos script: break it yourself
+
+[`chaos/chaos.ps1`](chaos/chaos.ps1) injects each failure on demand into the protected application, Smart Business AI
+Assistant (`sba-frontend` → `sba-backend` → `sba-postgres`), and measures what happens. Every injection is reversible
+with `reset`; real data is never changed.
+
+```powershell
+cd chaos
+.\chaos.ps1 list                                  # the failures
+.\chaos.ps1 status                                # containers and health endpoints
+.\chaos.ps1 stop-db                               # inject one failure
+.\chaos.ps1 measure stop-db -Healing on           # inject, time it, record it
+.\chaos.ps1 reset                                 # put everything back
+```
+
+| Failure | What it does |
+|---|---|
+| `stop-backend` | Stops the backend container |
+| `crash-backend` | Makes the backend process exit; Docker's restart policy brings it back |
+| `freeze-backend` | Freezes the backend process (SIGSTOP); the container keeps running |
+| `stop-db` | Stops PostgreSQL |
+| `block-db` | Disconnects PostgreSQL from its network; both containers stay up |
+| `corrupt-record` | Inserts one order whose status the app cannot read; the Orders page fails while health stays green |
+| `flood` | 20 000 API requests, 300 at a time |
+| `rotate-password` | Rotates the orders-service database password while the service keeps a hard-coded one |
+
+`measure` polls the application's own health endpoint every second, independently of RELAY, and records when it went
+down and when it came back. It then reads RELAY's incident record for the same failure (time to detect, time to
+recover) and appends a row to `chaos/results/chaos-results.csv`. `-Healing on|off` labels the run: *on* when the
+recovery policies are set to **Automatic** in Recovery policies, *off* when they are not.
+
+Measured results, healing off vs on, are in [chaos/RESULTS.md](chaos/RESULTS.md); the full write-up (architecture,
+failure table, before-and-after numbers, known limits) is the
+[Resilience Report](docs/RELAY-AEGIS-Resilience-Report.pdf).
+
+---
+
 ## Tests
 
 ```powershell
