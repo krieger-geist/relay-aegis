@@ -140,7 +140,7 @@ Measured results, healing off vs on, are in [chaos/RESULTS.md](chaos/RESULTS.md)
 failure table, before-and-after numbers, known limits) is the
 [Resilience Report](docs/RELAY-AEGIS-Resilience-Report.pdf).
 
-AI use is declared in the [AI Use Declaration](RELAY_AEGIS_AI_Use_Declaration.pdf) ([Word version](RELAY_AEGIS_AI_Use_Declaration.docx)).
+AI use is declared in the [AI Use Declaration](RELAY_AEGIS_AI_Use_Declaration.pdf).
 
 ---
 
