@@ -14,7 +14,7 @@
   </parent>
   <properties>
     <java.version>21</java.version>
-    <jjwt.version>0.12.6</jjwt.version>
+    <jjwt.version>0.13.0</jjwt.version>
     <!-- Newer than Spring Boot 3.4's 1.20.x, which cannot talk to Docker Engine 29 (minimum API 1.44). -->
     <testcontainers.version>1.21.4</testcontainers.version>
   </properties>
