@@ -1,0 +1,23 @@
+name: Feature request
+description: A failure RELAY should handle, a signal it should read, or an integration it should support
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What failure or workflow is not handled today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What should RELAY detect, do or show? How would the result be verified?
+    validations:
+      required: true
+  - type: textarea
+    id: safety
+    attributes:
+      label: Safety considerations
+      description: Which policy, allowlist or approval should guard it?

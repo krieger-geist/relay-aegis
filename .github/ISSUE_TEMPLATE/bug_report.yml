@@ -1,0 +1,37 @@
+name: Bug report
+description: Something RELAY did, or failed to do, that it should not have
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Please report security vulnerabilities privately (see SECURITY.md), not here.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [Runtime self-healing, Code self-healing, Live URL investigation, Authentication, UI, Deployment, Other]
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. …\n2. …"
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Incident or assessment ID, relevant log lines, screenshots. Remove secrets first.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: v1.0.0 or a commit SHA

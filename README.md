@@ -1,5 +1,9 @@
 # RELAY AEGIS
 
+[![CI](https://github.com/krieger-geist/relay-aegis/actions/workflows/ci.yml/badge.svg)](https://github.com/krieger-geist/relay-aegis/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/krieger-geist/relay-aegis/actions/workflows/codeql.yml/badge.svg)](https://github.com/krieger-geist/relay-aegis/actions/workflows/codeql.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+
 **Evidence-driven self-healing for software you operate.**
 RELAY AEGIS detects failures, explains them from evidence, repairs what it can repair safely, and proves the result before it calls anything fixed.
 
@@ -147,12 +151,14 @@ AI use is declared in the [AI Use Declaration](RELAY_AEGIS_AI_Use_Declaration.pd
 ## Tests
 
 ```powershell
-cd backend;  mvn -B clean test
+cd backend;  mvn -B verify
 cd frontend; npm ci; npm run lint; npm run typecheck; npm run test; npm run build
 docker compose config -q
 ```
 
-Current results are recorded in [PROJECT_STATUS.md](PROJECT_STATUS.md). The HTTP API is described in [openapi.yaml](openapi.yaml).
+CI runs the same checks on every push and pull request, plus the PostgreSQL integration tests (Testcontainers; skipped
+locally when Docker is not running), Docker image builds with a Trivy scan, and CodeQL. Tagging `vX.Y.Z` publishes signed
+images to GitHub Container Registry. Live-run results are recorded in [PROJECT_STATUS.md](PROJECT_STATUS.md). The HTTP API is described in [openapi.yaml](openapi.yaml).
 
 ---
 
@@ -162,3 +168,11 @@ Current results are recorded in [PROJECT_STATUS.md](PROJECT_STATUS.md). The HTTP
 - Repository analysis is heuristic static scanning of public repositories; findings are candidates until validated.
 - Two deterministic code-repair strategies exist; other findings receive recommendations, not patches.
 - Removing a hard-coded credential does not revoke it — rotate it with its issuer.
+
+---
+
+## Contributing, security and licence
+
+See [CONTRIBUTING.md](CONTRIBUTING.md), report vulnerabilities as described in [SECURITY.md](SECURITY.md), and find
+changes in [CHANGELOG.md](CHANGELOG.md) and planned work in [docs/ROADMAP.md](docs/ROADMAP.md).
+Licensed under the [Apache License 2.0](LICENSE).

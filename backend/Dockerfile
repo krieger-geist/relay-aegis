@@ -8,6 +8,6 @@ RUN mvn -q -DskipTests package
 FROM eclipse-temurin:21-jre-alpine
 RUN apk add --no-cache docker-cli git
 WORKDIR /app
-COPY --from=build /workspace/target/relay-aegis-api-0.2.0.jar app.jar
+COPY --from=build /workspace/target/relay-aegis-api-*.jar app.jar
 EXPOSE 8080
 ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75.0", "-jar", "/app/app.jar"]
