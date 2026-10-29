@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.relayaegis</groupId>
   <artifactId>relay-aegis-api</artifactId>
-  <version>0.2.0</version>
+  <version>1.0.0</version>
   <name>RELAY AEGIS API</name>
   <description>Source-aware self-healing software platform API</description>
   <parent>
@@ -15,6 +15,8 @@
   <properties>
     <java.version>21</java.version>
     <jjwt.version>0.12.6</jjwt.version>
+    <!-- Newer than Spring Boot 3.4's 1.20.x, which cannot talk to Docker Engine 29 (minimum API 1.44). -->
+    <testcontainers.version>1.21.4</testcontainers.version>
   </properties>
   <dependencies>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-web</artifactId></dependency>
@@ -31,6 +33,9 @@
     <dependency><groupId>com.h2database</groupId><artifactId>h2</artifactId><scope>runtime</scope></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>
     <dependency><groupId>org.springframework.security</groupId><artifactId>spring-security-test</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-testcontainers</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>org.testcontainers</groupId><artifactId>junit-jupiter</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>org.testcontainers</groupId><artifactId>postgresql</artifactId><scope>test</scope></dependency>
   </dependencies>
   <build>
     <plugins>
