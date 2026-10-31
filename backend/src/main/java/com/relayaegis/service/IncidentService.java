@@ -7,6 +7,7 @@ import com.relayaegis.dto.ApiDtos.RecoveryStepDto;
 import com.relayaegis.dto.ApiDtos.VerificationDto;
 import com.relayaegis.entity.ApplicationEntity;
 import com.relayaegis.entity.IncidentEntity;
+import com.relayaegis.observability.RelayMetrics;
 import com.relayaegis.repository.IncidentRepository;
 import com.relayaegis.util.JsonSupport;
 import java.time.Duration;
@@ -24,8 +25,11 @@ import org.springframework.web.server.ResponseStatusException;
 public class IncidentService {
     private final IncidentRepository incidents;
     private final JsonSupport json;
+    private final RelayMetrics metrics;
 
-    public IncidentService(IncidentRepository incidents, JsonSupport json) { this.incidents = incidents; this.json = json; }
+    public IncidentService(IncidentRepository incidents, JsonSupport json, RelayMetrics metrics) {
+        this.incidents = incidents; this.json = json; this.metrics = metrics;
+    }
 
     @Transactional(readOnly = true)
     public List<IncidentDto> list() { return incidents.findAllByOrderByDetectedAtDesc().stream().map(this::toDto).toList(); }
@@ -94,6 +98,7 @@ public class IncidentService {
             updateTimelineStep(incident, 4, "Verification", "No recovery action to verify.", "completed", "system", observedAt);
         }
         updateTimelineStep(incident, 5, "Observed recovery", detail, "completed", "system", observedAt);
+        metrics.incidentResolved(incident.applicationId, "observed", incident.detectedAt, observedAt);
         appendEvidence(incident, new EvidenceItemDto("ev-" + UUID.randomUUID().toString().substring(0, 8),
                 "health_check", "Recovery observed", detail, "URL monitor", observedAt, true));
         return incidents.save(incident);

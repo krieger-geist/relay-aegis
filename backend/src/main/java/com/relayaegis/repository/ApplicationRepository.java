@@ -7,4 +7,5 @@ import java.util.List;
 public interface ApplicationRepository extends JpaRepository<ApplicationEntity, String> {
     List<ApplicationEntity> findAllByOrderByCreatedAtDesc();
     boolean existsByUrl(String url);
+    long countByMonitoringEnabledTrue();
 }

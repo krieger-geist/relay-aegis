@@ -5,6 +5,7 @@ import com.relayaegis.dto.ApiDtos.EvidenceItemDto;
 import com.relayaegis.dto.ApiDtos.IncidentDto;
 import com.relayaegis.entity.ApplicationEntity;
 import com.relayaegis.entity.IncidentEntity;
+import com.relayaegis.observability.RelayMetrics;
 import com.relayaegis.recovery.RecoveryDecision;
 import com.relayaegis.recovery.RecoveryExecutor;
 import com.relayaegis.recovery.RecoveryGuard;
@@ -19,6 +20,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -44,13 +46,14 @@ public class RecoveryOrchestrationService {
     private final RecoveryGuard guard;
     private final RecoveryEventService recoveryEvents;
     private final Executor incidentExecutor;
+    private final RelayMetrics metrics;
     private final Duration backoffBase;
     /** Process-local guard: one recovery per incident at a time (single backend instance). */
     private final Set<String> inFlight = ConcurrentHashMap.newKeySet();
 
     public RecoveryOrchestrationService(IncidentService incidents, ApplicationService applications, DiagnosisService diagnosis,
             RecoveryPolicyEngine policyEngine, RecoveryExecutor executor, VerificationEngine verification, RecoveryGuard guard,
-            RecoveryEventService recoveryEvents, @Qualifier("incidentExecutor") Executor incidentExecutor,
+            RecoveryEventService recoveryEvents, @Qualifier("incidentExecutor") Executor incidentExecutor, RelayMetrics metrics,
             @Value("${relay.recovery.retry-backoff-ms:5000}") long backoffMs) {
         this.incidents = incidents;
         this.applications = applications;
@@ -61,6 +64,7 @@ public class RecoveryOrchestrationService {
         this.guard = guard;
         this.recoveryEvents = recoveryEvents;
         this.incidentExecutor = incidentExecutor;
+        this.metrics = metrics;
         this.backoffBase = Duration.ofMillis(Math.max(0, Math.min(60_000, backoffMs)));
     }
 
@@ -126,6 +130,8 @@ public class RecoveryOrchestrationService {
     }
 
     private void recordDecision(String incidentId, RecoveryDecision decision, boolean automatic) {
+        metrics.recoveryDecision(String.valueOf(decision.action()),
+                decision.authorized() ? "authorized" : decision.requiresApproval() ? "requires_approval" : "blocked", automatic);
         IncidentEntity incident = incidents.findEntity(incidentId);
         incidents.appendEvidence(incident, new EvidenceItemDto(evidenceId(), "recovery",
                 (automatic ? "Automatic" : "Operator") + " recovery policy decision", decision.summary()
@@ -152,7 +158,7 @@ public class RecoveryOrchestrationService {
         incident = incidents.save(incident);
         try {
             incidentExecutor.execute(() -> {
-                try { executeRecovery(incidentId, decision, startedNanos); }
+                try (var ignored = MDC.putCloseable("incidentId", incidentId)) { executeRecovery(incidentId, decision, startedNanos); }
                 finally { inFlight.remove(incidentId); }
             });
         } catch (RejectedExecutionException ex) {
@@ -180,6 +186,7 @@ public class RecoveryOrchestrationService {
             outcome = execution.commandSucceeded() ? verification.verify(app, decision)
                     : new VerificationEngine.VerificationResult("failed", "The recovery action could not be executed: " + execution.detail(), java.util.List.of());
             appendEvidence(incidentId, "verification", "Verification after attempt " + attempt + ": " + outcome.status(), outcome.detail());
+            metrics.recoveryAttempt(String.valueOf(decision.action()), outcome.status());
             guard.recordOutcome(decision.target(), outcome.passed(), Instant.now());
             if (outcome.passed()) break;
             String stop = guard.retryBlockReason(decision.target(), incidentId, Instant.now());
@@ -210,6 +217,8 @@ public class RecoveryOrchestrationService {
                 passed ? "Post-action verification passed." : "Verification not established as successful; escalated for human review.",
                 passed ? "completed" : "unresolved", "system", finishedAt);
         incidents.save(incident);
+        metrics.recoveryCompleted(String.valueOf(decision.action()), verificationStatus, duration);
+        if (passed) metrics.incidentResolved(incident.applicationId, "verified_recovery", incident.detectedAt, finishedAt);
         recoveryEvents.record(incident.id, incident.applicationName,
                 (passed ? "Recovery executed and verified: " : "Recovery attempted; not verified: ") + decision.action() + " on " + decision.target(),
                 passed ? "recovery_verified" : ("timed_out".equals(verificationStatus) ? "needs_review" : "recovery_failed"),

@@ -7,6 +7,7 @@ import com.relayaegis.entity.ApplicationEntity;
 import com.relayaegis.entity.HealthCheckEntity;
 import com.relayaegis.entity.IncidentEntity;
 import com.relayaegis.event.IncidentDetectedEvent;
+import com.relayaegis.observability.RelayMetrics;
 import com.relayaegis.repository.HealthCheckRepository;
 import com.relayaegis.util.TargetUrlPolicy;
 import java.net.ConnectException;
@@ -47,12 +48,13 @@ public class MonitoringService {
     private final int recoveryThreshold;
     private final ApplicationEventPublisher events;
     private final TransactionTemplate transactions;
+    private final RelayMetrics metrics;
     /** Serializes checks per application so concurrent manual and scheduled checks cannot open duplicate incidents. */
     private final Map<String, ReentrantLock> applicationLocks = new ConcurrentHashMap<>();
 
     public MonitoringService(ApplicationService applications, IncidentService incidentService,
             HealthCheckRepository healthChecks, TargetUrlPolicy targetUrlPolicy, ApplicationEventPublisher events,
-            PlatformTransactionManager transactionManager,
+            PlatformTransactionManager transactionManager, RelayMetrics metrics,
             @Value("${relay.monitoring.timeout-ms:2500}") int timeoutMs,
             @Value("${relay.monitoring.failure-threshold:2}") int failureThreshold,
             @Value("${relay.monitoring.recovery-threshold:2}") int recoveryThreshold) {
@@ -62,6 +64,7 @@ public class MonitoringService {
         this.targetUrlPolicy = targetUrlPolicy;
         this.events = events;
         this.transactions = new TransactionTemplate(transactionManager);
+        this.metrics = metrics;
         this.timeoutMs = Math.max(250, timeoutMs);
         this.failureThreshold = MonitoringRules.clampThreshold(failureThreshold);
         this.recoveryThreshold = MonitoringRules.clampThreshold(recoveryThreshold);
@@ -90,7 +93,9 @@ public class MonitoringService {
             URI uri = targetUrlPolicy.validate(app.url);
             // The network call happens outside any transaction so a slow target cannot hold a DB connection.
             Probe probe = probe(uri);
-            return transactions.execute(status -> record(applicationId, probe));
+            HealthCheckResult result = transactions.execute(status -> record(applicationId, probe));
+            metrics.healthCheck(applicationId, probe.outcome(), probe.elapsedMs());
+            return result;
         } finally {
             lock.unlock();
         }
@@ -178,6 +183,7 @@ public class MonitoringService {
         var incident = incidentService.create(app, title, "Sev-2", component, summary, "live");
         long detectionMs = Math.max(probe.elapsedMs(), Duration.between(firstFailure.checkedAt, Instant.now()).toMillis());
         incidentService.recordDetectionTiming(incident.id(), firstFailure.checkedAt, detectionMs);
+        metrics.incidentOpened(app.id, detectionMs);
         IncidentEntity entity = incidentService.findEntity(incident.id());
         for (int i = streak.size() - 1; i >= 0; i--) {
             HealthCheckEntity failed = streak.get(i);

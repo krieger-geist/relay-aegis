@@ -22,9 +22,11 @@ import com.relayaegis.entity.ApplicationEntity;
 import com.relayaegis.entity.HealthCheckEntity;
 import com.relayaegis.entity.IncidentEntity;
 import com.relayaegis.event.IncidentDetectedEvent;
+import com.relayaegis.observability.RelayMetrics;
 import com.relayaegis.repository.HealthCheckRepository;
 import com.relayaegis.util.TargetUrlPolicy;
 import com.sun.net.httpserver.HttpServer;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.time.Instant;
@@ -51,6 +53,7 @@ class MonitoringServiceTest {
     private ApplicationEventPublisher events;
     private ApplicationEntity app;
     private Optional<IncidentEntity> openIncident = Optional.empty();
+    private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
 
     @BeforeEach
     void setUp() throws Exception {
@@ -95,7 +98,21 @@ class MonitoringServiceTest {
 
     private MonitoringService service(int failureThreshold, int recoveryThreshold) {
         return new MonitoringService(applications, incidents, checks, new TargetUrlPolicy("127.0.0.1"), events,
-                mock(PlatformTransactionManager.class), 2000, failureThreshold, recoveryThreshold);
+                mock(PlatformTransactionManager.class), new RelayMetrics(meters), 2000, failureThreshold, recoveryThreshold);
+    }
+
+    @Test
+    void recordsCheckOutcomesAndTimeToDetectAsMetrics() {
+        statusCode.set(503);
+        MonitoringService monitoring = service(2, 2);
+
+        monitoring.check("app-1");
+        monitoring.check("app-1");
+
+        assertEquals(2, meters.get("relay.health.checks").tags("application", "app-1", "outcome", "degraded").counter().count());
+        assertEquals(2, meters.get("relay.health.check.duration").tags("application", "app-1").timer().count());
+        assertEquals(1, meters.get("relay.incidents.opened").tags("application", "app-1").counter().count());
+        assertEquals(1, meters.get("relay.incident.detection").tags("application", "app-1").timer().count());
     }
 
     @Test

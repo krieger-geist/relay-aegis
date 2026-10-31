@@ -19,6 +19,7 @@ import com.relayaegis.dto.ApiDtos.EvidenceItemDto;
 import com.relayaegis.entity.ApplicationEntity;
 import com.relayaegis.entity.IncidentEntity;
 import com.relayaegis.entity.RecoveryPolicyEntity;
+import com.relayaegis.observability.RelayMetrics;
 import com.relayaegis.recovery.RecoveryActionType;
 import com.relayaegis.recovery.RecoveryDecision;
 import com.relayaegis.recovery.RecoveryExecutor;
@@ -27,6 +28,7 @@ import com.relayaegis.recovery.RecoveryPolicyEngine;
 import com.relayaegis.recovery.VerificationEngine;
 import com.relayaegis.repository.RecoveryEventRepository;
 import com.relayaegis.repository.RecoveryPolicyRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -51,6 +53,7 @@ class RecoveryOrchestrationServiceTest {
     private String incidentState;
     private IncidentEntity current;
     private final List<EvidenceItemDto> evidence = new ArrayList<>();
+    private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
 
     @BeforeEach
     void setUp() {
@@ -84,7 +87,7 @@ class RecoveryOrchestrationServiceTest {
         RecoveryPolicyRepository policies = mock(RecoveryPolicyRepository.class);
         when(policies.findById("policy-restart")).thenReturn(Optional.of(policy));
         RecoveryPolicyEngine engine = new RecoveryPolicyEngine(policies, docker, guard);
-        return new RecoveryOrchestrationService(incidents, applications, diagnosis, engine, executor, verification, guard, events, workers, 0);
+        return new RecoveryOrchestrationService(incidents, applications, diagnosis, engine, executor, verification, guard, events, workers, new RelayMetrics(meters), 0);
     }
 
     private void diagnosed(RecoveryActionType action, double confidence) {
@@ -157,6 +160,10 @@ class RecoveryOrchestrationServiceTest {
         assertTrue(evidence.stream().anyMatch(e -> e.type().equals("verification") && e.title().contains("passed")));
         verify(events).record(anyString(), any(), org.mockito.ArgumentMatchers.contains("executed and verified"), org.mockito.ArgumentMatchers.eq("recovery_verified"),
                 any(), any(), anyString(), anyString());
+        assertEquals(1, meters.get("relay.recovery.decisions").tags("action", "START_CONTAINER", "decision", "authorized", "mode", "operator").counter().count());
+        assertEquals(1, meters.get("relay.recovery.attempts").tags("verification", "passed").counter().count());
+        assertEquals(1, meters.get("relay.recovery.duration").tags("outcome", "passed").timer().count());
+        assertEquals(1, meters.get("relay.incidents.resolved").tags("resolution", "verified_recovery").counter().count());
     }
 
     @Test
@@ -172,6 +179,9 @@ class RecoveryOrchestrationServiceTest {
         assertEquals("failed", current.verificationStatus);
         assertEquals("recovery_failed", current.status);
         assertTrue(evidence.stream().anyMatch(e -> e.title().equals("Recovery escalated")));
+        assertEquals(2, meters.get("relay.recovery.attempts").tags("verification", "failed").counter().count());
+        assertEquals(1, meters.get("relay.recovery.duration").tags("outcome", "failed").timer().count());
+        assertTrue(meters.find("relay.incidents.resolved").counters().isEmpty(), "an unverified recovery resolves nothing");
     }
 
     @Test
@@ -205,6 +215,8 @@ class RecoveryOrchestrationServiceTest {
 
         verify(executor, never()).execute(any(), any());
         assertTrue(evidence.stream().anyMatch(e -> e.detail().contains("requires operator approval")));
+        assertEquals(1, meters.get("relay.recovery.decisions").tags("decision", "requires_approval", "mode", "automatic").counter().count());
+        assertTrue(meters.find("relay.recovery.attempts").counters().isEmpty());
     }
 
     @Test

@@ -29,7 +29,15 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
+  metrics:
+    tags:
+      service: relay-aegis
+  tracing:
+    # Trace and span ids are added to every log line. Spans are exported only when
+    # MANAGEMENT_OTLP_TRACING_ENDPOINT is set (an OpenTelemetry collector, Jaeger or Tempo).
+    sampling:
+      probability: ${RELAY_TRACING_SAMPLING_PROBABILITY:1.0}
   endpoint:
     health:
       probes:

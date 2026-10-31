@@ -105,6 +105,37 @@ Key settings in `.env` (see `.env.example` for all of them):
 | `RELAY_GITHUB_TOKEN`, `RELAY_GITHUB_REMEDIATION_REPOSITORIES`, `RELAY_GITHUB_REMEDIATION_APPROVERS` | Pull-request remediation (fine-grained token, contents + pull requests write on the listed repositories only) |
 | `RELAY_AUTH_JWT_SECRET` | Token signing secret (set one for anything beyond a throwaway run) |
 | `GEMINI_API_KEY`, `GEMINI_MODEL` | Optional AI hypotheses |
+| `RELAY_SPRING_PROFILES` | `postgres` (default); `postgres,json-logs` for one JSON (ECS) object per log line |
+| `GRAFANA_ADMIN_PASSWORD` | Grafana admin password for the monitoring profile |
+
+### Observe RELAY itself
+
+RELAY exports its own operating metrics in Prometheus format at `http://localhost:8080/actuator/prometheus`:
+
+| Metric | Meaning |
+|---|---|
+| `relay_health_checks_total{application, outcome}` | Health checks recorded, by outcome |
+| `relay_health_check_duration_seconds` | Time taken by each check |
+| `relay_incidents_opened_total`, `relay_incidents_open` | Incidents opened; incidents not yet recovered |
+| `relay_incident_detection_seconds` | Time to detect: first failed check → incident opened |
+| `relay_incidents_resolved_total{resolution}` | `verified_recovery` (a RELAY action passed verification) or `observed` (seen healthy, no verified action) |
+| `relay_incident_recovery_seconds{resolution}` | Time to recover: first failed check → recovery |
+| `relay_recovery_decisions_total{action, decision, mode}` | Policy decisions: `authorized`, `requires_approval`, `blocked` |
+| `relay_recovery_attempts_total{action, verification}`, `relay_recovery_duration_seconds` | Executed attempts and their verification; authorization → final verification |
+
+Values are recorded when the matching record is stored, so the metrics never claim more than the incident records.
+
+```powershell
+docker compose --profile monitoring up -d   # adds Prometheus (localhost:9090) and Grafana (localhost:3300)
+```
+
+Grafana opens on the **RELAY AEGIS** dashboard (`monitoring/grafana/dashboards/relay-aegis.json`): open incidents,
+mean time to detect and recover, check outcomes and latency, detection/recovery percentiles, how incidents were
+resolved, policy decisions and recovery attempts.
+
+Trace and span ids are added to every log line, and the incident id to every line written while an incident is
+diagnosed or recovered. To export traces, set `MANAGEMENT_OTLP_TRACING_ENDPOINT` on the backend (for example
+`http://otel-collector:4318/v1/traces`).
 
 ---
 
