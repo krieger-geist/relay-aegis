@@ -14,6 +14,16 @@ and versions follow [Semantic Versioning](https://semver.org/).
   carried into incident worker threads and log lines.
 - `json-logs` profile for structured ECS log lines.
 
+### Security
+- The backend no longer mounts the Docker socket. Recovery and inspection go through `docker-proxy`, which admits only
+  container inspect, logs, stats and list, start, restart, network inspect and network connect; the patch sandbox goes
+  through `sandbox-proxy`, limited to `relay-sandbox-*` containers with host bind mounts refused. Both answer only the
+  backend service.
+
+### Changed
+- The sandbox runs a build with `start` and `wait` and copies its output out of the container by name, instead of
+  `start -a`, so every Docker call can be limited to the sandbox container's name.
+
 ## [1.0.0] - 2026-10-29
 
 First public release: the Sentry × Dezyne E'cole Hackathon 2026 system, with release engineering added.

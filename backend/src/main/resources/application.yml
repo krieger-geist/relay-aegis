@@ -69,6 +69,8 @@ relay:
       enabled: ${RELAY_RECOVERY_DOCKER_ENABLED:false}
       allowed-containers: ${RELAY_DOCKER_ALLOWED_CONTAINERS:relay-aegis-test-target}
       command: ${RELAY_DOCKER_COMMAND:docker}
+      # Docker endpoint for recovery and inspection, e.g. tcp://docker-proxy:2375. Blank: the CLI's default socket.
+      host: ${RELAY_DOCKER_HOST:}
     # Recovery guard: attempts per incident, per-container cooldown, and a circuit breaker over failed recoveries.
     max-attempts-per-incident: ${RELAY_RECOVERY_MAX_ATTEMPTS:2}
     cooldown-seconds: ${RELAY_RECOVERY_COOLDOWN_SECONDS:60}
@@ -90,6 +92,9 @@ relay:
   sandbox:
     # Patch validation in disposable Docker containers (build, tests, security re-scan). Off unless explicitly enabled.
     enabled: ${RELAY_SANDBOX_ENABLED:false}
+    # Docker endpoint for sandbox containers only, e.g. tcp://sandbox-proxy:2375. Blank: the CLI's default socket.
+    docker:
+      host: ${RELAY_SANDBOX_DOCKER_HOST:}
     network: ${RELAY_SANDBOX_NETWORK:none}
     memory: ${RELAY_SANDBOX_MEMORY:1g}
     cpus: ${RELAY_SANDBOX_CPUS:1}

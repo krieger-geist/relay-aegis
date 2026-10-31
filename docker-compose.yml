@@ -30,6 +30,63 @@ services:
       retries: 5
       start_period: 3s
 
+  # Least-privilege Docker access. Each proxy holds the socket read-only, answers only the "backend" service, and
+  # admits only the API calls listed (Go regexps, anchored at both ends). Everything else gets 403.
+  # Recovery and inspection: read container state, logs, stats and networks; start or restart a container; attach a
+  # container to a network. No create, exec, delete, image or volume calls.
+  docker-proxy:
+    image: wollomatic/socket-proxy:1.13.1
+    restart: unless-stopped
+    read_only: true
+    mem_limit: 64m
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    user: "0:0"
+    command:
+      - -loglevel=info
+      - -listenip=0.0.0.0
+      - -allowfrom=backend
+      - -allowhealthcheck
+      - -allowHEAD=(/v1\.[0-9]+)?/_ping
+      - -allowGET=((/v1\.[0-9]+)?/(_ping|version|info|containers/json|containers/[A-Za-z0-9][A-Za-z0-9_.-]*/(json|logs|stats)|networks/[A-Za-z0-9][A-Za-z0-9_.-]*))
+      - -allowPOST=(/v1\.[0-9]+/(containers/[A-Za-z0-9][A-Za-z0-9_.-]*/(start|restart)|networks/[A-Za-z0-9][A-Za-z0-9_.-]*/connect))
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    healthcheck:
+      test: ["CMD", "./healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Patch-validation sandbox only: create, copy files into and out of, start, wait for and remove containers named
+  # relay-sandbox-<12 hex>, and pull the configured build images. Host bind mounts are refused. Unused while RELAY_SANDBOX_ENABLED is false.
+  sandbox-proxy:
+    image: wollomatic/socket-proxy:1.13.1
+    restart: unless-stopped
+    read_only: true
+    mem_limit: 64m
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    user: "0:0"
+    command:
+      - -loglevel=info
+      - -listenip=0.0.0.0
+      - -allowfrom=backend
+      - -allowhealthcheck
+      - -allowbindmountfrom=/relay-sandbox-no-bind-mounts
+      - -allowHEAD=((/v1\.[0-9]+)?/(_ping|containers/relay-sandbox-[0-9a-f]{12}/archive))
+      - -allowGET=((/v1\.[0-9]+)?/(_ping|version|info|containers/relay-sandbox-[0-9a-f]{12}/(json|archive)|images/[A-Za-z0-9._/:@-]+/json))
+      - -allowPUT=(/v1\.[0-9]+/containers/relay-sandbox-[0-9a-f]{12}/archive)
+      - -allowPOST=(/v1\.[0-9]+/(containers/create|containers/relay-sandbox-[0-9a-f]{12}/(start|wait)|images/create))
+      - -allowDELETE=(/v1\.[0-9]+/containers/relay-sandbox-[0-9a-f]{12})
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    healthcheck:
+      test: ["CMD", "./healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
   backend:
     build: ./backend
     ports:
@@ -44,6 +101,9 @@ services:
       JPA_DDL_AUTO: validate
       FLYWAY_ENABLED: "true"
       RELAY_RECOVERY_DOCKER_ENABLED: "true"
+      # RELAY never sees the Docker socket: recovery and sandbox each reach Docker through their own allowlisting proxy.
+      RELAY_DOCKER_HOST: tcp://docker-proxy:2375
+      RELAY_SANDBOX_DOCKER_HOST: tcp://sandbox-proxy:2375
       RELAY_DOCKER_ALLOWED_CONTAINERS: "${RELAY_DOCKER_ALLOWED_CONTAINERS:-relay-aegis-test-target}"
       RELAY_DOCKER_INSPECT_CONTAINERS: "${RELAY_DOCKER_INSPECT_CONTAINERS:-}"
       RELAY_DOCKER_DEPENDENCIES: "${RELAY_DOCKER_DEPENDENCIES:-}"
@@ -79,9 +139,10 @@ services:
         condition: service_healthy
       test-target:
         condition: service_healthy
-    volumes:
-      # Local test only: access to the Docker socket is highly privileged.
-      - /var/run/docker.sock:/var/run/docker.sock
+      docker-proxy:
+        condition: service_healthy
+      sandbox-proxy:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/api/health || exit 1"]
       interval: 10s
