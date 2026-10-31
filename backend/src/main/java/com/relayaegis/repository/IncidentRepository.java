@@ -9,4 +9,5 @@ public interface IncidentRepository extends JpaRepository<IncidentEntity, String
     List<IncidentEntity> findByApplicationIdOrderByDetectedAtDesc(String applicationId);
     List<IncidentEntity> findByStateNotAndDiagnosisJsonIsNotNull(String state);
     long countByStateNot(String state);
+    List<IncidentEntity> findByStateIn(java.util.Collection<String> states);
 }

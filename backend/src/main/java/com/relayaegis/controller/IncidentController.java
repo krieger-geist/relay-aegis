@@ -3,6 +3,7 @@ package com.relayaegis.controller;
 import com.relayaegis.dto.ApiEnvelope;
 import com.relayaegis.dto.ApiDtos.DiagnosisDto;
 import com.relayaegis.dto.ApiDtos.IncidentDto;
+import com.relayaegis.dto.ApiDtos.RecoveryActionDto;
 import com.relayaegis.dto.ApiDtos.ResolutionProgressDto;
 import com.relayaegis.service.DiagnosisService;
 import com.relayaegis.service.IncidentService;
@@ -72,6 +73,13 @@ public class IncidentController {
     @PostMapping("/{id}/recover")
     public ApiEnvelope<IncidentDto> recover(@PathVariable String id) {
         IncidentDto dto=recovery.beginRecovery(id); return ApiEnvelope.of(dto, dto.provenance());
+    }
+    /** The durable action journal for this incident: every recovery attempt, oldest first. */
+    @GetMapping("/{id}/recovery-actions")
+    public ApiEnvelope<List<RecoveryActionDto>> recoveryActions(@PathVariable String id) {
+        return ApiEnvelope.of(recovery.actions(id).stream().map(a -> new RecoveryActionDto(a.id, a.runId, a.attempt, a.action, a.target,
+                a.automatic, a.policyId, a.phase, a.executionDetail, a.verificationStatus, a.verificationDetail, a.intendedAt,
+                a.executedAt, a.finishedAt)).toList(), "live");
     }
     @PostMapping("/{id}/diagnose")
     public ApiEnvelope<DiagnosisDto> diagnose(@PathVariable String id) {

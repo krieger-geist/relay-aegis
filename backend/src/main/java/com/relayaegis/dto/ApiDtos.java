@@ -41,6 +41,10 @@ public final class ApiDtos {
     public record RecoveryEventDto(String id, String incidentId, String applicationName, String event,
                                    String outcome, Instant timestamp, Long detectionDurationMs,
                                    Long recoveryDurationMs, String detail, String provenance) {}
+    /** One journaled recovery attempt: what was intended, whether it ran, and what verification observed. */
+    public record RecoveryActionDto(String id, String runId, int attempt, String action, String target, boolean automatic,
+                                    String policyId, String phase, String executionDetail, String verificationStatus,
+                                    String verificationDetail, Instant intendedAt, Instant executedAt, Instant finishedAt) {}
     public record RecoveryPolicyDto(String id, String action, String description, String mode,
                                     String risk, String scope, String provenance) {}
     public record UpdatePolicyRequest(String mode, String confirmation) {}

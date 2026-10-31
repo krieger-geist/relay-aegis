@@ -51,8 +51,8 @@ Each phase ends with something demonstrable and measured, and a LinkedIn/blog po
 **Done when:** every push is built and tested in CI, and `v1.0.0` images are pullable.
 
 ### Phase 1: Make RELAY reliable and observable (2–3 weeks)
-Progress: metrics, tracing, JSON logs, the Grafana dashboard and the Docker socket proxies are done; the action
-journal and leader election follow.
+Progress: metrics, tracing, JSON logs, the Grafana dashboard, the Docker socket proxies and the action journal are
+done; leader election follows.
 
 - Leader election (PostgreSQL advisory lock or ShedLock) so only one instance monitors and acts; run two replicas.
 - Durable action journal: intent → executed → verified recorded before and after each action, resumed after a crash.
