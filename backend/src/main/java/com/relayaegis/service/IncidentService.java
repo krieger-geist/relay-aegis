@@ -120,6 +120,9 @@ public class IncidentService {
         return incidents.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Incident not found."));
     }
 
+    /** Incidents whose recovery is marked as running ("action_taken" or "verifying"). */
+    public List<IncidentEntity> findInRecovery() { return incidents.findByStateIn(List.of("action_taken", "verifying")); }
+
     @Transactional
     public IncidentEntity save(IncidentEntity incident) { return incidents.save(incident); }
 

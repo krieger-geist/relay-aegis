@@ -1,5 +1,6 @@
 package com.relayaegis.recovery;
 
+import com.relayaegis.repository.RecoveryActionRepository;
 import com.relayaegis.repository.RecoveryEventRepository;
 import java.time.Duration;
 import java.time.Instant;
@@ -14,7 +15,7 @@ import org.springframework.stereotype.Component;
  * Bounds recovery so it can never loop: a per-target cooldown between distinct recovery runs, a per-incident
  * attempt limit, and a per-target circuit breaker that opens after repeated failed verifications and stays open
  * for a fixed period. State is in memory (single backend instance); the per-incident limit also counts recorded
- * recovery events, so a backend restart cannot reset it.
+ * recovery events and journaled attempts, so a backend restart cannot reset it.
  */
 @Component
 public class RecoveryGuard {
@@ -24,6 +25,7 @@ public class RecoveryGuard {
     private final Duration failureWindow;
     private final Duration openDuration;
     private final RecoveryEventRepository events;
+    private final RecoveryActionRepository actions;
 
     private final Map<String, Instant> lastRunByTarget = new ConcurrentHashMap<>();
     private final Map<String, Integer> attemptsByIncident = new ConcurrentHashMap<>();
@@ -35,13 +37,14 @@ public class RecoveryGuard {
             @Value("${relay.recovery.circuit.failure-threshold:3}") int failureThreshold,
             @Value("${relay.recovery.circuit.window-minutes:30}") long windowMinutes,
             @Value("${relay.recovery.circuit.open-minutes:15}") long openMinutes,
-            RecoveryEventRepository events) {
+            RecoveryEventRepository events, RecoveryActionRepository actions) {
         this.maxAttemptsPerIncident = Math.max(1, Math.min(5, maxAttemptsPerIncident));
         this.cooldown = Duration.ofSeconds(Math.max(0, cooldownSeconds));
         this.failureThreshold = Math.max(1, failureThreshold);
         this.failureWindow = Duration.ofMinutes(Math.max(1, windowMinutes));
         this.openDuration = Duration.ofMinutes(Math.max(1, openMinutes));
         this.events = events;
+        this.actions = actions;
     }
 
     public int maxAttemptsPerIncident() { return maxAttemptsPerIncident; }
@@ -98,7 +101,7 @@ public class RecoveryGuard {
     }
 
     private int attempts(String incidentId) {
-        int recorded = (int) Math.min(Integer.MAX_VALUE, events.countByIncidentId(incidentId));
+        int recorded = (int) Math.min(Integer.MAX_VALUE, Math.max(events.countByIncidentId(incidentId), actions.countByIncidentId(incidentId)));
         return Math.max(attemptsByIncident.getOrDefault(incidentId, 0), recorded);
     }
 }

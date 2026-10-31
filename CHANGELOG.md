@@ -13,6 +13,11 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - OpenTelemetry tracing (exported when `MANAGEMENT_OTLP_TRACING_ENDPOINT` is set); trace ids and the incident id are
   carried into incident worker threads and log lines.
 - `json-logs` profile for structured ECS log lines.
+- Durable recovery action journal (`recovery_actions`, migration V12). Each attempt's intent is committed before the
+  Docker call, then recorded as executed and verified. On startup RELAY resumes recoveries a stopped backend left
+  running: it re-verifies instead of repeating the action, retries only within the attempt limit, and hands back an
+  incident whose action never started. `GET /api/incidents/{id}/recovery-actions` lists the journal;
+  `relay_recovery_resumed_total` counts resumes.
 
 ### Security
 - The backend no longer mounts the Docker socket. Recovery and inspection go through `docker-proxy`, which admits only
@@ -21,6 +26,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
   backend service.
 
 ### Changed
+- The per-incident attempt limit also counts journaled attempts, so a restart cannot reset it.
 - The sandbox runs a build with `start` and `wait` and copies its output out of the container by name, instead of
   `start -a`, so every Docker call can be limited to the sandbox container's name.
 

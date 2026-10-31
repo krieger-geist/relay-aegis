@@ -41,7 +41,7 @@ class RecoveryPolicyEngineTest {
         when(docker.isEnabled()).thenReturn(true);
         when(docker.isAllowed(APP)).thenReturn(true);
         events = mock(RecoveryEventRepository.class);
-        guard = new RecoveryGuard(2, 60, 3, 30, 15, events);
+        guard = new RecoveryGuard(2, 60, 3, 30, 15, events, org.mockito.Mockito.mock(com.relayaegis.repository.RecoveryActionRepository.class));
         engine = new RecoveryPolicyEngine(policies, docker, guard);
         policy("policy-restart", "allow_automatically");
         policy("policy-dependency-restart", "disabled");

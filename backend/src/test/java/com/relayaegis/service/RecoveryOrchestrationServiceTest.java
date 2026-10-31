@@ -18,14 +18,17 @@ import com.relayaegis.diagnostics.EvidenceRef;
 import com.relayaegis.dto.ApiDtos.EvidenceItemDto;
 import com.relayaegis.entity.ApplicationEntity;
 import com.relayaegis.entity.IncidentEntity;
+import com.relayaegis.entity.RecoveryActionEntity;
 import com.relayaegis.entity.RecoveryPolicyEntity;
 import com.relayaegis.observability.RelayMetrics;
+import com.relayaegis.recovery.ActionJournal;
 import com.relayaegis.recovery.RecoveryActionType;
 import com.relayaegis.recovery.RecoveryDecision;
 import com.relayaegis.recovery.RecoveryExecutor;
 import com.relayaegis.recovery.RecoveryGuard;
 import com.relayaegis.recovery.RecoveryPolicyEngine;
 import com.relayaegis.recovery.VerificationEngine;
+import com.relayaegis.repository.RecoveryActionRepository;
 import com.relayaegis.repository.RecoveryEventRepository;
 import com.relayaegis.repository.RecoveryPolicyRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -54,6 +57,9 @@ class RecoveryOrchestrationServiceTest {
     private IncidentEntity current;
     private final List<EvidenceItemDto> evidence = new ArrayList<>();
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
+    /** The action journal's rows, kept in memory like the recovery_actions table. */
+    private final List<RecoveryActionEntity> journalRows = new ArrayList<>();
+    private RecoveryActionRepository actions;
 
     @BeforeEach
     void setUp() {
@@ -72,7 +78,8 @@ class RecoveryOrchestrationServiceTest {
         executor = mock(RecoveryExecutor.class);
         verification = mock(VerificationEngine.class);
         RecoveryEventRepository eventRepository = mock(RecoveryEventRepository.class);
-        guard = new RecoveryGuard(2, 60, 3, 30, 15, eventRepository);
+        actions = inMemoryActions();
+        guard = new RecoveryGuard(2, 60, 3, 30, 15, eventRepository, actions);
         events = mock(RecoveryEventService.class);
         policy = new RecoveryPolicyEntity(); policy.id = "policy-restart"; policy.action = "Restart an unhealthy container"; policy.mode = "require_approval";
     }
@@ -87,7 +94,8 @@ class RecoveryOrchestrationServiceTest {
         RecoveryPolicyRepository policies = mock(RecoveryPolicyRepository.class);
         when(policies.findById("policy-restart")).thenReturn(Optional.of(policy));
         RecoveryPolicyEngine engine = new RecoveryPolicyEngine(policies, docker, guard);
-        return new RecoveryOrchestrationService(incidents, applications, diagnosis, engine, executor, verification, guard, events, workers, new RelayMetrics(meters), 0);
+        return new RecoveryOrchestrationService(incidents, applications, diagnosis, engine, executor, verification, guard, events, workers, new RelayMetrics(meters),
+                new ActionJournal(actions), 0);
     }
 
     private void diagnosed(RecoveryActionType action, double confidence) {
@@ -295,11 +303,151 @@ class RecoveryOrchestrationServiceTest {
     }
 
     @Test
+    void eachAttemptIsJournaledFromIntentToVerification() {
+        diagnosed(RecoveryActionType.START_CONTAINER, 0.92);
+        when(executor.execute(any(), any())).thenAnswer(inv -> {
+            assertEquals(ActionJournal.INTENDED, journalRows.get(0).phase, "the intent is committed before Docker is called");
+            return new RecoveryExecutor.ExecutionResult(true, false, "Started container " + CONTAINER + ".");
+        });
+        when(verification.verify(any(), any())).thenReturn(new VerificationEngine.VerificationResult("passed", "Verified.", List.of()));
+
+        service(Runnable::run).beginRecovery("INC-1");
+
+        assertEquals(1, journalRows.size());
+        RecoveryActionEntity row = journalRows.get(0);
+        assertEquals(1, row.attempt);
+        assertEquals("START_CONTAINER", row.action);
+        assertEquals(CONTAINER, row.target);
+        assertEquals(ActionJournal.VERIFIED, row.phase);
+        assertEquals("passed", row.verificationStatus);
+        assertTrue(row.executedAt != null && row.finishedAt != null);
+    }
+
+    @Test
+    void failedVerificationRetriesAreJournaledAsSeparateAttemptsOfOneRun() {
+        diagnosed(RecoveryActionType.RESTART_CONTAINER, 0.85);
+        when(executor.execute(any(), any())).thenReturn(new RecoveryExecutor.ExecutionResult(true, false, "Restarted container."));
+        when(verification.verify(any(), any())).thenReturn(new VerificationEngine.VerificationResult("failed", "Still down.", List.of()));
+
+        service(Runnable::run).beginRecovery("INC-1");
+
+        assertEquals(List.of(1, 2), journalRows.stream().map(r -> r.attempt).toList());
+        assertTrue(journalRows.stream().allMatch(r -> ActionJournal.NOT_VERIFIED.equals(r.phase)));
+        assertEquals(1, journalRows.stream().map(r -> r.runId).distinct().count());
+    }
+
+    @Test
+    void nothingExecutesWhenTheIntentCannotBeJournaled() {
+        diagnosed(RecoveryActionType.START_CONTAINER, 0.92);
+        org.mockito.Mockito.doThrow(new org.springframework.dao.DataIntegrityViolationException("attempt already recorded")).when(actions).saveAndFlush(any());
+
+        service(Runnable::run).beginRecovery("INC-1");
+
+        verify(executor, never()).execute(any(), any());
+        assertEquals("unresolved", current.state);
+        assertEquals("failed", current.verificationStatus);
+        assertTrue(evidence.stream().anyMatch(e -> e.title().equals("Recovery stopped")));
+    }
+
+    @Test
+    void restartAfterIntentRecordedVerifiesInsteadOfRepeatingTheAction() {
+        crashedDuring(1, ActionJournal.INTENDED);
+        when(verification.verify(any(), any())).thenReturn(new VerificationEngine.VerificationResult("passed", "Verified.", List.of()));
+
+        service(Runnable::run).resumeInterruptedRecoveries();
+
+        verify(executor, never()).execute(any(), any());
+        assertEquals("recovered", current.state);
+        assertEquals("passed", current.verificationStatus);
+        RecoveryActionEntity row = journalRows.get(0);
+        assertEquals(ActionJournal.INTERRUPTED, row.phase, "an attempt whose result is unknown stays marked as interrupted");
+        assertEquals("passed", row.verificationStatus);
+        assertTrue(evidence.stream().anyMatch(e -> e.title().equals("Recovery resumed after restart") && e.detail().contains("not repeated")));
+        assertEquals(1, meters.get("relay.recovery.resumed").tags("verification", "passed").counter().count());
+        verify(events).record(anyString(), any(), anyString(), org.mockito.ArgumentMatchers.eq("recovery_verified"), any(), any(), anyString(), anyString());
+    }
+
+    @Test
+    void restartAfterAnExecutedAttemptThatStillFailsRetriesOnlyWithinTheAttemptLimit() {
+        crashedDuring(1, ActionJournal.EXECUTED);
+        when(executor.execute(any(), any())).thenReturn(new RecoveryExecutor.ExecutionResult(true, false, "Restarted container."));
+        when(verification.verify(any(), any())).thenReturn(new VerificationEngine.VerificationResult("failed", "Still down.", List.of()));
+
+        service(Runnable::run).resumeInterruptedRecoveries();
+
+        verify(executor, times(1)).execute(any(), any()); // attempt 1 was already executed; limit 2
+        assertEquals(List.of(1, 2), journalRows.stream().map(r -> r.attempt).toList());
+        assertEquals(ActionJournal.NOT_VERIFIED, journalRows.get(0).phase);
+        assertEquals(1, journalRows.stream().map(r -> r.runId).distinct().count(), "the retry continues the interrupted run");
+        assertEquals("unresolved", current.state);
+        assertTrue(evidence.stream().anyMatch(e -> e.title().equals("Recovery escalated")));
+    }
+
+    @Test
+    void restartWithTheAttemptLimitUsedUpNeverExecutesAgain() {
+        crashedDuring(1, ActionJournal.NOT_VERIFIED);
+        crashedDuring(2, ActionJournal.EXECUTED);
+        when(verification.verify(any(), any())).thenReturn(new VerificationEngine.VerificationResult("failed", "Still down.", List.of()));
+
+        service(Runnable::run).resumeInterruptedRecoveries();
+
+        verify(executor, never()).execute(any(), any());
+        assertEquals(2, journalRows.size());
+        assertEquals("recovery_failed", current.status);
+    }
+
+    @Test
+    void restartBeforeAnyIntentHandsTheIncidentBackWithoutActing() {
+        current = incident("action_taken");
+        when(incidents.findInRecovery()).thenAnswer(inv -> List.of(copy(current)));
+
+        service(Runnable::run).resumeInterruptedRecoveries();
+
+        verify(executor, never()).execute(any(), any());
+        verify(verification, never()).verify(any(), any());
+        assertEquals("unresolved", current.state);
+        assertEquals("needs_review", current.status);
+        assertEquals("not_run", current.verificationStatus);
+    }
+
+    @Test
     void decisionRecordsAreNeverAuthorizedWhenBlocked() {
         RecoveryDecision blocked = RecoveryDecision.blocked(RecoveryActionType.RESTART_CONTAINER, CONTAINER, "policy-restart", "disabled",
                 "oom-killed", 0.9, List.of(), "disabled", false);
         assertFalse(blocked.authorized());
         assertTrue(blocked.summary().startsWith("Not authorized"));
+    }
+
+    /** A previous process stopped while the incident was in recovery, with this attempt journaled in this phase. */
+    private void crashedDuring(int attempt, String phase) {
+        current = incident("action_taken");
+        when(incidents.findInRecovery()).thenAnswer(inv -> List.of(copy(current)));
+        RecoveryActionEntity row = new RecoveryActionEntity();
+        row.id = "act-" + attempt; row.runId = "run-1"; row.incidentId = "INC-1"; row.attempt = attempt;
+        row.action = "RESTART_CONTAINER"; row.target = CONTAINER; row.appContainer = CONTAINER; row.policyId = "policy-restart";
+        row.policyMode = "require_approval"; row.phase = phase; row.intendedAt = Instant.now().minusSeconds(30);
+        if (!ActionJournal.INTENDED.equals(phase)) { row.executionDetail = "Restarted container."; row.executedAt = row.intendedAt.plusSeconds(1); }
+        journalRows.add(row);
+    }
+
+    private RecoveryActionRepository inMemoryActions() {
+        RecoveryActionRepository repository = mock(RecoveryActionRepository.class);
+        when(repository.saveAndFlush(any())).thenAnswer(inv -> {
+            RecoveryActionEntity row = inv.getArgument(0);
+            journalRows.removeIf(r -> r.id.equals(row.id));
+            journalRows.add(row);
+            journalRows.sort(java.util.Comparator.comparingInt(r -> r.attempt));
+            return row;
+        });
+        when(repository.findTopByIncidentIdOrderByAttemptDesc(anyString())).thenAnswer(inv -> journalRows.stream()
+                .filter(r -> r.incidentId.equals(inv.getArgument(0))).reduce((a, b) -> b));
+        when(repository.findTopByRunIdOrderByAttemptAsc(anyString())).thenAnswer(inv -> journalRows.stream()
+                .filter(r -> r.runId.equals(inv.getArgument(0))).findFirst());
+        when(repository.findByIncidentIdOrderByAttemptAsc(anyString())).thenAnswer(inv -> journalRows.stream()
+                .filter(r -> r.incidentId.equals(inv.getArgument(0))).toList());
+        when(repository.countByIncidentId(anyString())).thenAnswer(inv -> journalRows.stream()
+                .filter(r -> r.incidentId.equals(inv.getArgument(0))).count());
+        return repository;
     }
 
     private static IncidentEntity incident(String state) {

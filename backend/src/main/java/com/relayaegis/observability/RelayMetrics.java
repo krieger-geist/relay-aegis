@@ -75,6 +75,12 @@ public class RelayMetrics {
                 .tag("action", safe(action)).tag("verification", safe(verification)).register(registry).increment();
     }
 
+    /** A recovery resumed from the action journal after a restart, by the result of its re-verification. */
+    public void recoveryResumed(String action, String verification) {
+        Counter.builder("relay.recovery.resumed").description("Recoveries resumed from the action journal after a restart")
+                .tag("action", safe(action)).tag("verification", safe(verification)).register(registry).increment();
+    }
+
     /** A finished recovery: total time from authorization to the final verification, with its outcome. */
     public void recoveryCompleted(String action, String outcome, long durationMs) {
         Timer.builder("relay.recovery.duration").description("Authorized action to final verification")
