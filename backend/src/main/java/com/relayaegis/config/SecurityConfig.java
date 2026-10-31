@@ -37,8 +37,8 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 /**
- * Stateless API security. Public: registration, login, refresh, logout, /api/health and the actuator health/info
- * probes used by container health checks. Everything else under /api (and the remaining actuator endpoints)
+ * Stateless API security. Public: registration, login, refresh, logout, /api/health, the actuator health/info
+ * probes used by container health checks, and the Prometheus scrape endpoint. Everything else under /api (and the remaining actuator endpoints)
  * requires a valid access token.
  *
  * <p>CSRF: Spring's synchronizer-token CSRF is turned off on purpose, not by default. Application endpoints only
@@ -78,6 +78,9 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login", "/api/auth/refresh", "/api/auth/logout").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/health").permitAll()
                 .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
+                // Prometheus scrapes without a user session. The API port is bound to localhost by Compose and the
+                // frontend proxy refuses /actuator/, so this is reachable only from the host and the Compose network.
+                .requestMatchers(HttpMethod.GET, "/actuator/prometheus").permitAll()
                 .requestMatchers("/error").permitAll()
                 .anyRequest().authenticated())
             .exceptionHandling(errors -> errors

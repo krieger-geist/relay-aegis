@@ -5,6 +5,15 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Prometheus metrics at `/actuator/prometheus`: health checks by outcome and duration, incidents opened and open, time
+  to detect, time to recover by resolution (verified recovery or observed), recovery policy decisions, recovery
+  attempts and duration.
+- Optional `monitoring` Compose profile with Prometheus and a provisioned Grafana dashboard.
+- OpenTelemetry tracing (exported when `MANAGEMENT_OTLP_TRACING_ENDPOINT` is set); trace ids and the incident id are
+  carried into incident worker threads and log lines.
+- `json-logs` profile for structured ECS log lines.
+
 ## [1.0.0] - 2026-10-29
 
 First public release: the Sentry × Dezyne E'cole Hackathon 2026 system, with release engineering added.

@@ -35,7 +35,8 @@ services:
     ports:
       - "127.0.0.1:8080:8080"
     environment:
-      SPRING_PROFILES_ACTIVE: postgres
+      # Add ",json-logs" for one JSON (ECS) object per log line, for Loki, Elasticsearch or Datadog.
+      SPRING_PROFILES_ACTIVE: "${RELAY_SPRING_PROFILES:-postgres}"
       SERVER_ADDRESS: 0.0.0.0
       DATABASE_URL: jdbc:postgresql://db:5432/relay_aegis
       DATABASE_USERNAME: relay
@@ -97,5 +98,41 @@ services:
       backend:
         condition: service_healthy
 
+  # Optional: docker compose --profile monitoring up -d
+  # Prometheus scrapes RELAY's own metrics; Grafana opens with the RELAY AEGIS dashboard (http://localhost:3300).
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    profiles: [monitoring]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=30d
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - relay-prometheus-data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  grafana:
+    image: grafana/grafana:12.1.0
+    profiles: [monitoring]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:-relay_dev_only}"
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/relay-aegis.json
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - relay-grafana-data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:3300:3000"
+    depends_on:
+      - prometheus
+
 volumes:
   relay-postgres-data:
+  relay-prometheus-data:
+  relay-grafana-data:

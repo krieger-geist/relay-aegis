@@ -73,7 +73,7 @@ Status date: 2026-10-21 (frozen release).
 
 | Suite | Result |
 |---|---|
-| Backend (`mvn -B verify`, including PostgreSQL 16 integration tests via Testcontainers) | 425 tests, 0 failures, 0 errors |
+| Backend (`mvn -B verify`, including PostgreSQL 16 integration tests via Testcontainers) | 431 tests, 0 failures, 0 errors |
 | Frontend (`vitest`) | 25 files, 170 tests passed |
 | TypeScript (`tsc --noEmit`) | Passed |
 | ESLint | 0 errors, 0 warnings |

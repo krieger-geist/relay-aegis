@@ -13,8 +13,10 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.relayaegis.dto.ApiDtos.AiAttemptDto;
 import com.relayaegis.dto.ApiDtos.DiagnosisDto;
 import com.relayaegis.entity.IncidentEntity;
+import com.relayaegis.observability.RelayMetrics;
 import com.relayaegis.repository.IncidentRepository;
 import com.relayaegis.util.JsonSupport;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -34,7 +36,7 @@ class RecoveredIncidentAiRetryTest {
     void observedRecoveryCancelsThePendingAiRetryButKeepsTheDiagnosisAndHistory() throws Exception {
         IncidentRepository repository = mock(IncidentRepository.class);
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        IncidentService service = new IncidentService(repository, new JsonSupport(mapper));
+        IncidentService service = new IncidentService(repository, new JsonSupport(mapper), new RelayMetrics(new SimpleMeterRegistry()));
         IncidentEntity incident = new IncidentEntity();
         incident.id = "INC-1"; incident.state = "unresolved"; incident.status = "active_incident"; incident.verificationStatus = "not_run";
         Instant next = Instant.now().minusSeconds(5);
@@ -54,7 +56,7 @@ class RecoveredIncidentAiRetryTest {
 
     @Test
     void cancellingIsANoOpWithoutAPendingRetry() throws Exception {
-        IncidentService service = new IncidentService(mock(IncidentRepository.class), new JsonSupport(mapper));
+        IncidentService service = new IncidentService(mock(IncidentRepository.class), new JsonSupport(mapper), new RelayMetrics(new SimpleMeterRegistry()));
         IncidentEntity incident = new IncidentEntity();
         String json = mapper.writeValueAsString(fallbackWithPendingRetry(null));
         incident.diagnosisJson = json;

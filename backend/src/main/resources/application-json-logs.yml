@@ -1,0 +1,10 @@
+# Structured console logs in Elastic Common Schema: one JSON object per line, with the trace id, span id and
+# incidentId (when the line belongs to an incident) as fields. For Loki, Elasticsearch, Datadog and similar.
+# Enable with SPRING_PROFILES_ACTIVE=postgres,json-logs.
+logging:
+  structured:
+    format:
+      console: ecs
+    ecs:
+      service:
+        name: relay-aegis

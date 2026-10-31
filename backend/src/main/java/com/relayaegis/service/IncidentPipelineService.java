@@ -7,6 +7,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
@@ -38,6 +39,10 @@ public class IncidentPipelineService {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onIncidentDetected(IncidentDetectedEvent event) {
         String id = event.incidentId();
+        try (var ignored = MDC.putCloseable("incidentId", id)) { handle(id); }
+    }
+
+    private void handle(String id) {
         Optional<DiagnosisDto> deterministic = Optional.empty();
         try { deterministic = diagnosis.diagnoseDeterministically(id); }
         catch (RuntimeException ex) { log.warn("Deterministic diagnosis could not be recorded for incident {}: {}", id, ex.getMessage()); }
