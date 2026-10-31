@@ -18,19 +18,19 @@ class AutoRecoveryServiceTest {
     @Test
     void reportsWhenThePolicyEngineAuthorizedAutomaticRecovery() {
         when(recovery.beginAutomaticRecovery("INC-1")).thenReturn(true);
-        assertTrue(new AutoRecoveryService(recovery).startIfAllowed("INC-1"));
+        assertTrue(new AutoRecoveryService(recovery, com.relayaegis.cluster.LeaderElection.standalone()).startIfAllowed("INC-1"));
         verify(recovery).beginAutomaticRecovery("INC-1");
     }
 
     @Test
     void reportsWhenRecoveryWasNotAuthorized() {
         when(recovery.beginAutomaticRecovery("INC-1")).thenReturn(false);
-        assertFalse(new AutoRecoveryService(recovery).startIfAllowed("INC-1"));
+        assertFalse(new AutoRecoveryService(recovery, com.relayaegis.cluster.LeaderElection.standalone()).startIfAllowed("INC-1"));
     }
 
     @Test
     void neverThrowsIntoTheIncidentPipeline() {
         when(recovery.beginAutomaticRecovery("INC-1")).thenThrow(new IllegalStateException("boom"));
-        assertFalse(new AutoRecoveryService(recovery).startIfAllowed("INC-1"));
+        assertFalse(new AutoRecoveryService(recovery, com.relayaegis.cluster.LeaderElection.standalone()).startIfAllowed("INC-1"));
     }
 }

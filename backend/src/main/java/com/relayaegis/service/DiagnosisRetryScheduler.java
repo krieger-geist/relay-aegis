@@ -1,5 +1,6 @@
 package com.relayaegis.service;
 
+import com.relayaegis.cluster.LeaderElection;
 import com.relayaegis.dto.ApiDtos.DiagnosisDto;
 import java.util.Optional;
 import java.util.concurrent.Executor;
@@ -27,19 +28,21 @@ public class DiagnosisRetryScheduler {
     private final DiagnosisService diagnosis;
     private final Executor aiExecutor;
     private final boolean enabled;
+    private final LeaderElection leadership;
     private final AtomicBoolean roundInProgress = new AtomicBoolean(false);
 
     public DiagnosisRetryScheduler(DiagnosisService diagnosis, @Qualifier("aiExecutor") Executor aiExecutor,
-            @Value("${relay.ai.diagnosis-retry.enabled:true}") boolean enabled) {
+            @Value("${relay.ai.diagnosis-retry.enabled:true}") boolean enabled, LeaderElection leadership) {
         this.diagnosis = diagnosis;
         this.aiExecutor = aiExecutor;
         this.enabled = enabled;
+        this.leadership = leadership;
     }
 
     @Scheduled(fixedDelayString = "${relay.ai.diagnosis-retry.interval-ms:60000}",
             initialDelayString = "${relay.ai.diagnosis-retry.initial-delay-ms:60000}")
     public void dispatchDueRetries() {
-        if (!enabled || !roundInProgress.compareAndSet(false, true)) return;
+        if (!enabled || !leadership.isLeader() || !roundInProgress.compareAndSet(false, true)) return;
         try {
             aiExecutor.execute(() -> {
                 try { runRound(); }

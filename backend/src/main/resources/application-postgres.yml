@@ -10,3 +10,7 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+
+relay:
+  leader:
+    enabled: ${RELAY_LEADER_ELECTION_ENABLED:true}

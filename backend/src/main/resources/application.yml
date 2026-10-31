@@ -44,6 +44,14 @@ management:
         enabled: true
       show-details: when_authorized
 relay:
+  leader:
+    # Lease-based leader election for running several backend instances: only the leader monitors and runs recovery,
+    # the others forward those requests to it. Off by default (single instance); on in the postgres profile.
+    enabled: ${RELAY_LEADER_ELECTION_ENABLED:false}
+    lease-ttl-ms: ${RELAY_LEADER_LEASE_TTL_MS:15000}
+    renew-interval-ms: ${RELAY_LEADER_RENEW_INTERVAL_MS:5000}
+    # URL other instances use to reach this one. Blank: http://<this host's address>:<server.port>.
+    advertise-url: ${RELAY_LEADER_ADVERTISE_URL:}
   cors:
     allowed-origins: ${RELAY_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
   auth:

@@ -1,5 +1,7 @@
 package com.relayaegis.service;
 
+import com.relayaegis.cluster.LeaderElection;
+import com.relayaegis.cluster.LeadershipGrantedEvent;
 import com.relayaegis.diagnostics.DiagnosticResult;
 import com.relayaegis.dto.ApiDtos.EvidenceItemDto;
 import com.relayaegis.dto.ApiDtos.IncidentDto;
@@ -25,7 +27,6 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -53,6 +54,7 @@ public class RecoveryOrchestrationService {
     private final Executor incidentExecutor;
     private final RelayMetrics metrics;
     private final ActionJournal journal;
+    private final LeaderElection leadership;
     private final Duration backoffBase;
     /** Process-local guard: one recovery per incident at a time (single backend instance). */
     private final Set<String> inFlight = ConcurrentHashMap.newKeySet();
@@ -60,6 +62,7 @@ public class RecoveryOrchestrationService {
     public RecoveryOrchestrationService(IncidentService incidents, ApplicationService applications, DiagnosisService diagnosis,
             RecoveryPolicyEngine policyEngine, RecoveryExecutor executor, VerificationEngine verification, RecoveryGuard guard,
             RecoveryEventService recoveryEvents, @Qualifier("incidentExecutor") Executor incidentExecutor, RelayMetrics metrics, ActionJournal journal,
+            LeaderElection leadership,
             @Value("${relay.recovery.retry-backoff-ms:5000}") long backoffMs) {
         this.incidents = incidents;
         this.applications = applications;
@@ -72,6 +75,7 @@ public class RecoveryOrchestrationService {
         this.incidentExecutor = incidentExecutor;
         this.metrics = metrics;
         this.journal = journal;
+        this.leadership = leadership;
         this.backoffBase = Duration.ofMillis(Math.max(0, Math.min(60_000, backoffMs)));
     }
 
@@ -92,6 +96,10 @@ public class RecoveryOrchestrationService {
     }
 
     private IncidentDto begin(String incidentId, boolean automatic) {
+        if (!leadership.isLeader()) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "This RELAY instance is not the leader; only the leader runs recovery. Retry in a few seconds.");
+        }
         IncidentEntity incident = incidents.findEntity(incidentId);
         ApplicationEntity app = applications.findEntity(incident.applicationId);
         if ("Production".equalsIgnoreCase(app.environment)) {
@@ -191,6 +199,7 @@ public class RecoveryOrchestrationService {
             Instant startedAt, VerificationEngine.VerificationResult outcome, String lastExecution) {
         int attemptsThisRun = 0;
         while (true) {
+            if (!leadership.isLeader()) { abandon(incidentId); return; }
             if (outcome != null) {
                 if (outcome.passed()) break;
                 String stop = guard.retryBlockReason(decision.target(), incidentId, Instant.now());
@@ -223,7 +232,16 @@ public class RecoveryOrchestrationService {
             metrics.recoveryAttempt(String.valueOf(decision.action()), outcome.status());
             guard.recordOutcome(decision.target(), outcome.passed(), Instant.now());
         }
+        if (!leadership.isLeader()) { abandon(incidentId); return; }
         finish(incidentId, decision, outcome, lastExecution, startedAt);
+    }
+
+    /**
+     * Leadership was lost mid-recovery: stop without executing or recording an outcome. The incident stays in
+     * recovery and the journal shows how far it got, so the new leader resumes it.
+     */
+    private void abandon(String incidentId) {
+        log.warn("Leadership lost during recovery of {}; leaving it to the new leader to resume from the journal", incidentId);
     }
 
     private void finish(String incidentId, RecoveryDecision decision, VerificationEngine.VerificationResult outcome, String lastExecution, Instant startedAt) {
@@ -260,10 +278,10 @@ public class RecoveryOrchestrationService {
      * Finishes recoveries that a previous backend process left running (incident still "action_taken" or
      * "verifying"). Nothing is executed again blindly: the journal's last attempt is re-verified first, and further
      * attempts follow only through the same guard (attempt limit, circuit breaker) as a normal run. An incident with
-     * no journaled attempt never reached Docker and is handed back for review. Runs once when the application is
-     * ready; with more than one backend instance this must run on the leader only.
+     * no journaled attempt never reached Docker and is handed back for review. Runs whenever this instance becomes the
+     * leader (at startup for a single instance), so a recovery the previous leader left is taken over.
      */
-    @EventListener(ApplicationReadyEvent.class)
+    @EventListener(LeadershipGrantedEvent.class)
     public void resumeInterruptedRecoveries() {
         try {
             for (IncidentEntity incident : incidents.findInRecovery()) {

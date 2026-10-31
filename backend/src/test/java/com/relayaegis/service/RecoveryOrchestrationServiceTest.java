@@ -60,6 +60,7 @@ class RecoveryOrchestrationServiceTest {
     /** The action journal's rows, kept in memory like the recovery_actions table. */
     private final List<RecoveryActionEntity> journalRows = new ArrayList<>();
     private RecoveryActionRepository actions;
+    private com.relayaegis.cluster.LeaderElection leadership = com.relayaegis.cluster.LeaderElection.standalone();
 
     @BeforeEach
     void setUp() {
@@ -95,7 +96,7 @@ class RecoveryOrchestrationServiceTest {
         when(policies.findById("policy-restart")).thenReturn(Optional.of(policy));
         RecoveryPolicyEngine engine = new RecoveryPolicyEngine(policies, docker, guard);
         return new RecoveryOrchestrationService(incidents, applications, diagnosis, engine, executor, verification, guard, events, workers, new RelayMetrics(meters),
-                new ActionJournal(actions), 0);
+                new ActionJournal(actions), leadership, 0);
     }
 
     private void diagnosed(RecoveryActionType action, double confidence) {
@@ -408,6 +409,36 @@ class RecoveryOrchestrationServiceTest {
         assertEquals("unresolved", current.state);
         assertEquals("needs_review", current.status);
         assertEquals("not_run", current.verificationStatus);
+    }
+
+    @Test
+    void aFollowerRefusesToRunRecovery() {
+        leadership = mock(com.relayaegis.cluster.LeaderElection.class);
+        when(leadership.isLeader()).thenReturn(false);
+        diagnosed(RecoveryActionType.START_CONTAINER, 0.92);
+
+        var refused = assertThrows(ResponseStatusException.class, () -> service(Runnable::run).beginRecovery("INC-1"));
+
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, refused.getStatusCode());
+        verify(executor, never()).execute(any(), any());
+    }
+
+    @Test
+    void leadershipLostMidRecoveryStopsBeforeTheNextActionAndLeavesItToTheNewLeader() {
+        leadership = mock(com.relayaegis.cluster.LeaderElection.class);
+        // leader for the decision and attempt 1; lost before the retry
+        when(leadership.isLeader()).thenReturn(true, true, false);
+        diagnosed(RecoveryActionType.START_CONTAINER, 0.92);
+        when(executor.execute(any(), any())).thenReturn(new RecoveryExecutor.ExecutionResult(true, false, "Started."));
+        when(verification.verify(any(), any())).thenReturn(new VerificationEngine.VerificationResult("failed", "Still down.", List.of()));
+
+        service(Runnable::run).beginRecovery("INC-1");
+
+        verify(executor, times(1)).execute(any(), any());
+        assertEquals("action_taken", current.state, "no outcome is recorded by an instance that is no longer the leader");
+        assertEquals(1, journalRows.size());
+        assertEquals(ActionJournal.NOT_VERIFIED, journalRows.get(0).phase);
+        verify(events, never()).record(any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
