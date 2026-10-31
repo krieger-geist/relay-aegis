@@ -5,30 +5,37 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-31
+
+Reliability and observability release (roadmap Phase 1). RELAY can now run as several instances with exactly one
+acting, survives being killed in the middle of a repair without losing the incident or repeating the action, reaches
+Docker only through allowlisting proxies, and exposes Prometheus metrics, traces and structured logs.
+
+Chaos-tested with two replicas: the leader was killed right after recording its intent to start a container; the other replica took
+over in 17.5 s, verified instead of repeating the action, and closed the incident with exactly one container start.
+
 ### Added
-- Prometheus metrics at `/actuator/prometheus`: health checks by outcome and duration, incidents opened and open, time
-  to detect, time to recover by resolution (verified recovery or observed), recovery policy decisions, recovery
-  attempts and duration.
+- **High availability.** Leader election through a lease in PostgreSQL (`leader_leases`, migration V13), renewed on
+  its own thread. Only the leader monitors, retries AI diagnosis and runs recovery; other instances forward recovery
+  and health-check requests to it, and a new leader resumes the previous leader's recoveries. The Compose `ha` profile
+  adds a second backend; `relay_leader` shows which instance leads.
+- **Crash-safe recovery.** A durable action journal (`recovery_actions`, migration V12): each attempt's intent is
+  committed before the Docker call, then recorded as executed and verified. After a crash or failover, RELAY verifies
+  instead of repeating an action whose result is unknown, retries only within the attempt limit, and hands back an
+  incident whose action never started. `GET /api/incidents/{id}/recovery-actions` lists the journal;
+  `relay_recovery_resumed_total` counts resumes.
+- **Metrics** at `/actuator/prometheus`: health checks by outcome and duration, incidents opened and open, time to
+  detect, time to recover by resolution, recovery policy decisions, recovery attempts and duration.
 - Optional `monitoring` Compose profile with Prometheus and a provisioned Grafana dashboard.
 - OpenTelemetry tracing (exported when `MANAGEMENT_OTLP_TRACING_ENDPOINT` is set); trace ids and the incident id are
   carried into incident worker threads and log lines.
 - `json-logs` profile for structured ECS log lines.
-- Durable recovery action journal (`recovery_actions`, migration V12). Each attempt's intent is committed before the
-  Docker call, then recorded as executed and verified. On startup RELAY resumes recoveries a stopped backend left
-  running: it re-verifies instead of repeating the action, retries only within the attempt limit, and hands back an
-  incident whose action never started. `GET /api/incidents/{id}/recovery-actions` lists the journal;
-  `relay_recovery_resumed_total` counts resumes.
-
-- Leader election for running several backend instances: a lease in PostgreSQL (`leader_leases`, migration V13),
-  renewed on its own thread. Only the leader monitors, runs AI retries and runs recovery; other instances forward
-  recovery and health-check requests to it. A new leader resumes the previous leader's recoveries from the action
-  journal. `relay_leader` reports which instance leads. Compose `ha` profile adds a second backend.
 
 ### Security
-- The backend no longer mounts the Docker socket. Recovery and inspection go through `docker-proxy`, which admits only
-  container inspect, logs, stats and list, start, restart, network inspect and network connect; the patch sandbox goes
-  through `sandbox-proxy`, limited to `relay-sandbox-*` containers with host bind mounts refused. Both answer only the
-  backend service.
+- **Least-privilege Docker access.** The backend no longer mounts the Docker socket. Recovery and inspection go through
+  `docker-proxy`, which admits only container inspect, logs, stats and list, start, restart, network inspect and
+  network connect; the patch sandbox goes through `sandbox-proxy`, limited to `relay-sandbox-*` containers with host
+  bind mounts refused. Both answer only the backend service.
 
 ### Changed
 - Recovery stops before its next action, without recording an outcome, if the instance loses leadership; the new
@@ -36,6 +43,12 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - The per-incident attempt limit also counts journaled attempts, so a restart cannot reset it.
 - The sandbox runs a build with `start` and `wait` and copies its output out of the container by name, instead of
   `start -a`, so every Docker call can be limited to the sandbox container's name.
+
+### Upgrading
+- Migrations V12 and V13 apply automatically on startup.
+- Running more than one backend instance requires a shared `RELAY_AUTH_JWT_SECRET`.
+- Compose now starts `docker-proxy` and `sandbox-proxy`; a custom deployment that mounted the Docker socket into the
+  backend should point `RELAY_DOCKER_HOST` and `RELAY_SANDBOX_DOCKER_HOST` at equivalent proxies instead.
 
 ## [1.0.0] - 2026-10-29
 
@@ -61,5 +74,6 @@ First public release: the Sentry × Dezyne E'cole Hackathon 2026 system, with re
 ### Changed
 - Frontend image installs dependencies with `npm ci` from the lockfile for reproducible builds.
 
-[Unreleased]: https://github.com/krieger-geist/relay-aegis/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/krieger-geist/relay-aegis/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/krieger-geist/relay-aegis/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/krieger-geist/relay-aegis/releases/tag/v1.0.0
