@@ -54,6 +54,7 @@ Every finding — from any source — uses one model: severity, confidence, evid
 - **Authentication:** JWT access tokens (in memory) + rotating HttpOnly refresh cookie; BCrypt password hashing; login attempt limiting; roles `USER` / `ADMIN`.
 - **Allowlists:** monitoring hosts, assessment hosts, recoverable Docker containers and remediation repositories are explicit environment allowlists.
 - **Production protection:** recovery against applications marked Production is blocked by policy. Enabling automatic recovery requires typing `CONFIRM-AUTO-REPAIR`.
+- **Least-privilege Docker access:** the backend never mounts the Docker socket. It reaches Docker through two socket proxies that answer only the `backend` service and admit only listed API calls (everything else gets HTTP 403). `docker-proxy` (recovery and inspection) allows reading container state, logs, stats and networks, starting or restarting a container and attaching it to a network; no create, exec, delete, image or volume calls. `sandbox-proxy` allows creating, copying into and out of, starting, waiting for and removing only `relay-sandbox-<12 hex>` containers, and pulling build images; host bind mounts are refused.
 - **Sandbox:** throwaway container per run, all Linux capabilities dropped, `no-new-privileges`, memory/CPU/PID limits, removed afterwards; network `none` unless configured.
 - **Approvals:** pull requests can be created only by ADMIN users or emails in `RELAY_GITHUB_REMEDIATION_APPROVERS`, only for repositories in `RELAY_GITHUB_REMEDIATION_REPOSITORIES`, and only for validated patches.
 - **Secrets:** API keys and tokens stay in backend environment variables; they are never returned by the API, logged or sent to the browser. Credential literals are redacted in findings and patch previews.
@@ -105,6 +106,7 @@ Key settings in `.env` (see `.env.example` for all of them):
 | `RELAY_GITHUB_TOKEN`, `RELAY_GITHUB_REMEDIATION_REPOSITORIES`, `RELAY_GITHUB_REMEDIATION_APPROVERS` | Pull-request remediation (fine-grained token, contents + pull requests write on the listed repositories only) |
 | `RELAY_AUTH_JWT_SECRET` | Token signing secret (set one for anything beyond a throwaway run) |
 | `GEMINI_API_KEY`, `GEMINI_MODEL` | Optional AI hypotheses |
+| `RELAY_DOCKER_HOST`, `RELAY_SANDBOX_DOCKER_HOST` | Docker endpoints for recovery and for the sandbox (Compose: the two socket proxies). Blank: the Docker CLI's default socket, for development outside Docker |
 | `RELAY_SPRING_PROFILES` | `postgres` (default); `postgres,json-logs` for one JSON (ECS) object per log line |
 | `GRAFANA_ADMIN_PASSWORD` | Grafana admin password for the monitoring profile |
 
@@ -195,7 +197,7 @@ images to GitHub Container Registry. Live-run results are recorded in [PROJECT_S
 
 ## Scope and limitations
 
-- Local, single-host deployment. The Compose stack mounts the Docker socket and is not hardened for exposure to untrusted networks.
+- Local, single-host deployment, not hardened for exposure to untrusted networks. The socket proxies hold the Docker socket; the sandbox proxy can create containers and does not inspect the creation request beyond bind mounts (a `--privileged` request would pass), so keep `RELAY_SANDBOX_ENABLED=false` unless you need sandbox validation.
 - Repository analysis is heuristic static scanning of public repositories; findings are candidates until validated.
 - Two deterministic code-repair strategies exist; other findings receive recommendations, not patches.
 - Removing a hard-coded credential does not revoke it — rotate it with its issuer.

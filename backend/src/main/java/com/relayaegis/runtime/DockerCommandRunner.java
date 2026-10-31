@@ -18,6 +18,10 @@ import org.springframework.stereotype.Component;
  * read-only inspection (inspect, stats, logs, ps, info) and the two lifecycle mutations recovery may use
  * (start, restart). Container, project and service names are validated; no caller - and never AI output - can
  * pass free-form arguments. Output is bounded and never logged (logs may contain sensitive data).
+ *
+ * <p>When {@code relay.recovery.docker.host} is set (Compose sets {@code tcp://docker-proxy:2375}), the CLI talks to a
+ * socket proxy that admits only the API calls listed above, so even a bug here cannot create, exec into or delete
+ * containers.
  */
 @Component
 public class DockerCommandRunner {
@@ -27,9 +31,12 @@ public class DockerCommandRunner {
     static final Duration MUTATION_TIMEOUT = Duration.ofSeconds(20);
 
     private final String command;
+    private final String dockerHost;
 
-    public DockerCommandRunner(@Value("${relay.recovery.docker.command:docker}") String command) {
+    public DockerCommandRunner(@Value("${relay.recovery.docker.command:docker}") String command,
+                               @Value("${relay.recovery.docker.host:}") String dockerHost) {
         this.command = command;
+        this.dockerHost = dockerHost == null ? "" : dockerHost.trim();
     }
 
     /** exitCode -1 means the process could not run or exceeded its deadline (see {@code failure}). */
@@ -92,7 +99,9 @@ public class DockerCommandRunner {
         Path output = null;
         try {
             output = Files.createTempFile("relay-docker-", ".out");
-            Process process = new ProcessBuilder(commandLine).redirectErrorStream(true).redirectOutput(output.toFile()).start();
+            ProcessBuilder builder = new ProcessBuilder(commandLine).redirectErrorStream(true).redirectOutput(output.toFile());
+            if (!dockerHost.isEmpty()) builder.environment().put("DOCKER_HOST", dockerHost);
+            Process process = builder.start();
             if (!process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
                 process.destroyForcibly();
                 return new Result(-1, "", "Docker command exceeded its " + timeout.toSeconds() + " s deadline.");

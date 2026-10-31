@@ -241,14 +241,14 @@ class SandboxValidationServiceTest {
     void dockerRunnerUsesFixedCommandsAndIsolatedDefaults() {
         assertTrue(DockerSandboxRunner.commandFor(SandboxRunner.Ecosystem.NPM, SandboxRunner.Phase.BUILD).contains("--ignore-scripts"));
         assertEquals("mvn -B -q test", DockerSandboxRunner.commandFor(SandboxRunner.Ecosystem.MAVEN, SandboxRunner.Phase.TEST));
-        DockerSandboxRunner runner = new DockerSandboxRunner(false, "docker", "host", "999999g", "1;rm", 1, "maven:3.9-eclipse-temurin-21", "node:20-alpine", "python:3.12-slim");
+        DockerSandboxRunner runner = new DockerSandboxRunner(false, "docker", "", "host", "999999g", "1;rm", 1, "maven:3.9-eclipse-temurin-21", "node:20-alpine", "python:3.12-slim");
         String isolation = runner.describeIsolation();
         assertTrue(isolation.contains("network none"), "only none|bridge networks are accepted");
         assertTrue(isolation.contains("memory 1g") && isolation.contains("cpus 1") && isolation.contains("pids 32"));
         assertFalse(runner.available(), "disabled runner never reports availability");
         assertEquals("not_available", runner.run(Path.of("."), SandboxRunner.Ecosystem.MAVEN, SandboxRunner.Phase.BUILD, java.time.Duration.ofSeconds(1)).status());
         org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () ->
-                new DockerSandboxRunner(true, "docker", "none", "1g", "1", 256, "maven;rm -rf /", "node:20-alpine", "python:3.12-slim"));
+                new DockerSandboxRunner(true, "docker", "", "none", "1g", "1", 256, "maven;rm -rf /", "node:20-alpine", "python:3.12-slim"));
     }
 
     @Test

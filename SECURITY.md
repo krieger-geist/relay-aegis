@@ -37,5 +37,9 @@ These are deliberate limits; reports that bypass them are especially valuable:
   and does not follow redirects.
 - AI output is advisory only and never authorizes or executes an action.
 
-Known limitation: the Compose stack mounts the Docker socket and is intended for a local, single host. Do not expose it
-to untrusted networks.
+- RELAY never holds the Docker socket. Recovery and the sandbox each reach Docker through their own socket proxy, which
+  answers only the backend container and admits only the Docker API calls that path needs.
+
+Known limitations: the stack is intended for a local, single host; do not expose it to untrusted networks. The sandbox
+proxy refuses host bind mounts but does not inspect other container-creation options (for example `--privileged`), so
+sandbox validation stays off unless `RELAY_SANDBOX_ENABLED=true`.

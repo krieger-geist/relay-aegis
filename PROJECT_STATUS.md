@@ -82,7 +82,7 @@ Status date: 2026-10-21 (frozen release).
 
 ## Known limitations
 
-- Local single-host deployment; the Docker socket mount is not suitable for untrusted networks.
+- Local single-host deployment, not suitable for untrusted networks. Docker access goes through two allowlisting socket proxies; the sandbox proxy can still create containers (bind mounts refused).
 - Repository rules are heuristic. Known gap: the credential rule does not flag every naming pattern (for example a `*_SECRET_KEY` constant).
 - Code repair is limited to the two deterministic strategies; the Dockerfile strategy is covered by automated tests but has not been exercised against a live repository.
 - Sandbox runs can take several minutes for Maven projects (no shared dependency cache by design).

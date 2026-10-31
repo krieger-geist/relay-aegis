@@ -161,7 +161,7 @@ class DockerRuntimeInspectorTest {
 
     @Test
     void commandRunnerRejectsAnythingButPlainObjectNames() {
-        DockerCommandRunner runner = new DockerCommandRunner("docker");
+        DockerCommandRunner runner = new DockerCommandRunner("docker", "");
         for (String bad : List.of("--privileged", "a b", "x;rm -rf /", "$(id)", "", "../etc")) {
             assertThrows(IllegalArgumentException.class, () -> runner.restart(bad), bad);
         }
@@ -169,7 +169,7 @@ class DockerRuntimeInspectorTest {
 
     @Test
     void runnerBoundsExecutionTimeAndNeverThrowsWhenTheBinaryIsMissing() {
-        DockerCommandRunner runner = new DockerCommandRunner("relay-no-such-docker-binary");
+        DockerCommandRunner runner = new DockerCommandRunner("relay-no-such-docker-binary", "");
         DockerCommandRunner.Result result = runner.execute(List.of("info"), Duration.ofSeconds(2));
         assertFalse(result.ok());
         assertEquals(-1, result.exitCode());
