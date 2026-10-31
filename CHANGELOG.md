@@ -19,6 +19,11 @@ and versions follow [Semantic Versioning](https://semver.org/).
   incident whose action never started. `GET /api/incidents/{id}/recovery-actions` lists the journal;
   `relay_recovery_resumed_total` counts resumes.
 
+- Leader election for running several backend instances: a lease in PostgreSQL (`leader_leases`, migration V13),
+  renewed on its own thread. Only the leader monitors, runs AI retries and runs recovery; other instances forward
+  recovery and health-check requests to it. A new leader resumes the previous leader's recoveries from the action
+  journal. `relay_leader` reports which instance leads. Compose `ha` profile adds a second backend.
+
 ### Security
 - The backend no longer mounts the Docker socket. Recovery and inspection go through `docker-proxy`, which admits only
   container inspect, logs, stats and list, start, restart, network inspect and network connect; the patch sandbox goes
@@ -26,6 +31,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
   backend service.
 
 ### Changed
+- Recovery stops before its next action, without recording an outcome, if the instance loses leadership; the new
+  leader resumes it.
 - The per-incident attempt limit also counts journaled attempts, so a restart cannot reset it.
 - The sandbox runs a build with `start` and `wait` and copies its output out of the container by name, instead of
   `start -a`, so every Docker call can be limited to the sandbox container's name.

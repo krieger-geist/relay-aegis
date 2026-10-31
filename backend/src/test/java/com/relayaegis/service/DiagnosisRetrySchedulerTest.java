@@ -27,7 +27,7 @@ class DiagnosisRetrySchedulerTest {
         when(diagnosis.dueAiRetries(anyInt())).thenReturn(List.of("INC-A", "INC-B", "INC-C"));
         when(diagnosis.retryAiDiagnosis("INC-A")).thenReturn(Optional.of(outcome("deterministic-fallback", "http_503")));
 
-        int attempted = new DiagnosisRetryScheduler(diagnosis, Runnable::run, true).runRound();
+        int attempted = new DiagnosisRetryScheduler(diagnosis, Runnable::run, true, com.relayaegis.cluster.LeaderElection.standalone()).runRound();
 
         assertEquals(1, attempted);
         verify(diagnosis, never()).retryAiDiagnosis("INC-B");
@@ -41,20 +41,20 @@ class DiagnosisRetrySchedulerTest {
         when(diagnosis.retryAiDiagnosis("INC-B")).thenThrow(new IllegalStateException("database unavailable"));
         when(diagnosis.retryAiDiagnosis("INC-C")).thenReturn(Optional.of(outcome("gemini", null)));
 
-        assertEquals(2, new DiagnosisRetryScheduler(diagnosis, Runnable::run, true).runRound());
+        assertEquals(2, new DiagnosisRetryScheduler(diagnosis, Runnable::run, true, com.relayaegis.cluster.LeaderElection.standalone()).runRound());
     }
 
     @Test
     void asksForAtMostThreeIncidentsPerRound() {
         when(diagnosis.dueAiRetries(DiagnosisRetryScheduler.MAX_PER_ROUND)).thenReturn(List.of());
-        new DiagnosisRetryScheduler(diagnosis, Runnable::run, true).runRound();
+        new DiagnosisRetryScheduler(diagnosis, Runnable::run, true, com.relayaegis.cluster.LeaderElection.standalone()).runRound();
         verify(diagnosis).dueAiRetries(3);
     }
 
     @Test
     void dispatchesToTheIncidentExecutorAndNeverOverlapsRounds() {
         List<Runnable> submitted = new ArrayList<>();
-        DiagnosisRetryScheduler scheduler = new DiagnosisRetryScheduler(diagnosis, submitted::add, true);
+        DiagnosisRetryScheduler scheduler = new DiagnosisRetryScheduler(diagnosis, submitted::add, true, com.relayaegis.cluster.LeaderElection.standalone());
 
         scheduler.dispatchDueRetries();
         scheduler.dispatchDueRetries();
@@ -69,7 +69,7 @@ class DiagnosisRetrySchedulerTest {
     @Test
     void doesNothingWhenDisabled() {
         List<Runnable> submitted = new ArrayList<>();
-        new DiagnosisRetryScheduler(diagnosis, submitted::add, false).dispatchDueRetries();
+        new DiagnosisRetryScheduler(diagnosis, submitted::add, false, com.relayaegis.cluster.LeaderElection.standalone()).dispatchDueRetries();
         assertEquals(0, submitted.size());
     }
 }

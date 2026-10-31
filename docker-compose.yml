@@ -150,6 +150,19 @@ services:
       retries: 12
       start_period: 25s
 
+  # Second backend instance for high availability: `docker compose --profile ha up -d`. Both share the database and
+  # elect one leader, which monitors and runs recovery; the other serves the API and forwards recovery requests to it.
+  # It answers to the same "backend" name, so the frontend and both Docker proxies treat the two alike.
+  # Needs RELAY_AUTH_JWT_SECRET set, so an access token issued by one instance is accepted by the other.
+  backend-2:
+    extends:
+      service: backend
+    profiles: ["ha"]
+    ports: !reset []
+    networks:
+      default:
+        aliases: [backend]
+
   frontend:
     build:
       context: ./frontend
