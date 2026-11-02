@@ -44,6 +44,14 @@ management:
         enabled: true
       show-details: when_authorized
 relay:
+  signals:
+    # Alert webhooks (/api/signals/alertmanager, /webhook): callers send "Authorization: Bearer <token>" (24+ characters).
+    # Blank: those endpoints are off.
+    token: ${RELAY_SIGNALS_TOKEN:}
+    # Sentry integration client secret, used to verify Sentry-Hook-Signature. Blank: /api/signals/sentry is off.
+    sentry-client-secret: ${RELAY_SENTRY_CLIENT_SECRET:}
+    # Sentry project slug to RELAY application (id, name or container): "orders-api=orders-service,web=storefront".
+    sentry-projects: ${RELAY_SENTRY_PROJECTS:}
   runbooks:
     # Directory of YAML runbooks (new failure types without code changes). Compose mounts ./runbooks here.
     dir: ${RELAY_RUNBOOKS_DIR:}

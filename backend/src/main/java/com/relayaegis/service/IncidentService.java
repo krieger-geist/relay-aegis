@@ -40,6 +40,13 @@ public class IncidentService {
     @Transactional
     public IncidentDto create(ApplicationEntity app, String title, String severity, String component,
                               String summary, String provenance) {
+        return create(app, title, severity, component, summary, provenance, "health_check", "RELAY monitoring");
+    }
+
+    /** Opens an incident whose first evidence item has the given type and source (e.g. an external alert). */
+    @Transactional
+    public IncidentDto create(ApplicationEntity app, String title, String severity, String component,
+                              String summary, String provenance, String evidenceType, String evidenceSource) {
         Instant now = Instant.now();
         IncidentEntity e = new IncidentEntity();
         e.id = "INC-" + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
@@ -56,7 +63,7 @@ public class IncidentService {
         e.confidence = null;
         e.supportingEvidenceJson = json.write(List.of());
         e.evidenceJson = json.write(List.of(new EvidenceItemDto("ev-" + UUID.randomUUID().toString().substring(0, 8),
-                "health_check", "Failure observed", summary, "RELAY monitoring", now, true)));
+                evidenceType, "Failure observed", summary, evidenceSource, now, true)));
         e.verificationStatus = "not_run";
         e.verificationDetail = "No recovery action has been executed.";
         e.recoveryDurationMs = null;
@@ -101,7 +108,7 @@ public class IncidentService {
         metrics.incidentResolved(incident.applicationId, "observed", incident.detectedAt, observedAt);
         appendEvidence(incident, new EvidenceItemDto("ev-" + UUID.randomUUID().toString().substring(0, 8),
                 "health_check", "Recovery observed", detail, "URL monitor", observedAt, true));
-        return incidents.save(incident);
+        return save(incident);
     }
 
     /**
@@ -123,8 +130,26 @@ public class IncidentService {
     /** Incidents whose recovery is marked as running ("action_taken" or "verifying"). */
     public List<IncidentEntity> findInRecovery() { return incidents.findByStateIn(List.of("action_taken", "verifying")); }
 
+    /**
+     * Saves the incident. Several writers (monitoring, alert signals, diagnosis, recovery) each load, change and save
+     * the whole row, so the evidence is merged with what is stored under a row lock: evidence is append-only, and an
+     * item recorded by another writer since this copy was loaded is kept rather than overwritten.
+     */
     @Transactional
-    public IncidentEntity save(IncidentEntity incident) { return incidents.save(incident); }
+    public IncidentEntity save(IncidentEntity incident) {
+        if (incident.id != null) incident.evidenceJson = mergeEvidence(incidents.lockEvidence(incident.id), incident.evidenceJson);
+        return incidents.save(incident);
+    }
+
+    private String mergeEvidence(String stored, String mine) {
+        if (stored == null || stored.equals(mine)) return mine;
+        TypeReference<List<EvidenceItemDto>> type = new TypeReference<>() {};
+        List<EvidenceItemDto> merged = new ArrayList<>(json.read(stored, type, List.of()));
+        java.util.Set<String> ids = new java.util.HashSet<>();
+        merged.forEach(item -> ids.add(item.id()));
+        for (EvidenceItemDto item : json.read(mine, type, List.<EvidenceItemDto>of())) if (ids.add(item.id())) merged.add(item);
+        return json.write(merged);
+    }
 
     public IncidentDto toDto(IncidentEntity e) {
         List<String> supporting = json.read(e.supportingEvidenceJson, new TypeReference<List<String>>() {}, List.of());
@@ -154,6 +179,11 @@ public class IncidentService {
         incident.detectionDurationMs = Math.max(0, detectionDurationMs);
         updateTimelineStep(incident, 0, "Failure detected", incident.summary, "completed", "system", failureStartedAt);
         save(incident);
+    }
+
+    /** The incident's recorded evidence items. */
+    public List<EvidenceItemDto> evidence(IncidentEntity incident) {
+        return json.read(incident.evidenceJson, new TypeReference<List<EvidenceItemDto>>() {}, List.of());
     }
 
     public void appendEvidence(IncidentEntity incident, EvidenceItemDto item) {

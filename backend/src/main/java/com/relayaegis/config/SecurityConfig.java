@@ -81,6 +81,8 @@ public class SecurityConfig {
                 // Prometheus scrapes without a user session. The API port is bound to localhost by Compose and the
                 // frontend proxy refuses /actuator/, so this is reachable only from the host and the Compose network.
                 .requestMatchers(HttpMethod.GET, "/actuator/prometheus").permitAll()
+                // Alert webhooks are called by other tools, not users; SignalController verifies each one's token or signature.
+                .requestMatchers(HttpMethod.POST, "/api/signals/**").permitAll()
                 .requestMatchers("/error").permitAll()
                 .anyRequest().authenticated())
             .exceptionHandling(errors -> errors

@@ -15,6 +15,6 @@ public class WebConfig implements WebMvcConfigurer {
     /** Requests that make RELAY act run on the leader; see {@link LeaderForwardingInterceptor}. */
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(leaderForwarding).addPathPatterns("/api/incidents/*/recover", "/api/applications/*/checks");
+        registry.addInterceptor(leaderForwarding).addPathPatterns("/api/incidents/*/recover", "/api/applications/*/checks", "/api/signals/**");
     }
 }

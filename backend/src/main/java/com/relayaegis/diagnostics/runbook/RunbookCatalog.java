@@ -13,6 +13,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
@@ -38,6 +39,7 @@ public class RunbookCatalog {
     private volatile List<Runbook> runbooks = List.of();
     private volatile List<Status> statuses = List.of();
 
+    @Autowired
     public RunbookCatalog(@Value("${relay.runbooks.dir:}") String directory) {
         this(directory == null || directory.isBlank() ? null : Path.of(directory.trim()),
                 Set.copyOf(com.relayaegis.diagnostics.FailurePatternRegistry.builtIns().stream().map(p -> p.id()).toList()));
@@ -93,6 +95,8 @@ public class RunbookCatalog {
                     out.add(new Source("built-in/" + resource.getFilename(), new String(in.readNBytes(RunbookParser.MAX_FILE_BYTES + 1), StandardCharsets.UTF_8)));
                 } catch (IOException ex) { log.warn("Bundled runbook {} unreadable", resource.getFilename()); }
             });
+        } catch (java.io.FileNotFoundException ex) {
+            // No runbooks are bundled in the jar; only the directory is read.
         } catch (IOException ex) {
             log.warn("Bundled runbooks could not be listed: {}", ex.getClass().getSimpleName());
         }

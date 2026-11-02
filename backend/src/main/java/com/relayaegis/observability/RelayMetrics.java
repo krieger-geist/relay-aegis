@@ -75,6 +75,12 @@ public class RelayMetrics {
                 .tag("action", safe(action)).tag("verification", safe(verification)).register(registry).increment();
     }
 
+    /** An alert received from another tool ({@code alertmanager}, {@code sentry}, {@code webhook}), firing or resolved. */
+    public void signalReceived(String source, String status) {
+        Counter.builder("relay.signals.received").description("Alerts received from other tools")
+                .tag("source", safe(source)).tag("status", safe(status)).register(registry).increment();
+    }
+
     /** A recovery resumed from the action journal after a restart, by the result of its re-verification. */
     public void recoveryResumed(String action, String verification) {
         Counter.builder("relay.recovery.resumed").description("Recoveries resumed from the action journal after a restart")

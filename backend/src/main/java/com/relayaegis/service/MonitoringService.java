@@ -214,7 +214,8 @@ public class MonitoringService {
         return "Incident " + incident.id + " resolved after observed recovery.";
     }
 
-    private static String componentFor(ApplicationEntity app) {
+    /** The incident component for an application: its container when linked, else its URL health check. */
+    public static String componentFor(ApplicationEntity app) {
         return app.dockerContainer != null && !app.dockerContainer.isBlank() ? "docker:" + app.dockerContainer : "url-health-check";
     }
 
