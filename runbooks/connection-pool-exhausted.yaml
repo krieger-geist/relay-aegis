@@ -1,0 +1,28 @@
+# A leaked or undersized database connection pool: every request waits for a connection and times out.
+# A restart releases the leaked connections, which buys time; the leak itself still has to be fixed.
+id: connection-pool-exhausted
+title: Database connection pool exhausted
+category: application
+confidence: 0.93
+cause: >-
+  The application has no free database connections: every request waits for the pool and times out,
+  usually because connections are leaked or the pool is too small for the load.
+explanation: >-
+  The health check fails with HTTP 5xx and the logs show the connection pool timing out.
+match:
+  failing: true
+  healthCheck:
+    outcomes: [degraded]
+    statusCodes: [500, 502, 503, 504]
+  logs:
+    patterns:
+      - 'Connection is not available, request timed out'
+      - 'Timeout waiting for idle object'
+      - 'remaining connection slots are reserved'
+      - 'too many clients already'
+action:
+  type: RESTART_CONTAINER
+  target: app
+  text: >-
+    Restart the application once to release the leaked connections, then find the leak
+    (connections opened without being closed) or raise the pool size.

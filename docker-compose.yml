@@ -104,6 +104,8 @@ services:
       # RELAY never sees the Docker socket: recovery and sandbox each reach Docker through their own allowlisting proxy.
       RELAY_DOCKER_HOST: tcp://docker-proxy:2375
       RELAY_SANDBOX_DOCKER_HOST: tcp://sandbox-proxy:2375
+      # YAML runbooks from ./runbooks (new failure types without code changes), re-read every minute.
+      RELAY_RUNBOOKS_DIR: /app/runbooks
       RELAY_DOCKER_ALLOWED_CONTAINERS: "${RELAY_DOCKER_ALLOWED_CONTAINERS:-relay-aegis-test-target}"
       RELAY_DOCKER_INSPECT_CONTAINERS: "${RELAY_DOCKER_INSPECT_CONTAINERS:-}"
       RELAY_DOCKER_DEPENDENCIES: "${RELAY_DOCKER_DEPENDENCIES:-}"
@@ -134,6 +136,8 @@ services:
       RELAY_GITHUB_TOKEN: ${RELAY_GITHUB_TOKEN:-}
       RELAY_GITHUB_REMEDIATION_REPOSITORIES: "${RELAY_GITHUB_REMEDIATION_REPOSITORIES:-}"
       RELAY_GITHUB_REMEDIATION_APPROVERS: "${RELAY_GITHUB_REMEDIATION_APPROVERS:-}"
+    volumes:
+      - ./runbooks:/app/runbooks:ro
     depends_on:
       db:
         condition: service_healthy

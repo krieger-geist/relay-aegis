@@ -44,6 +44,9 @@ management:
         enabled: true
       show-details: when_authorized
 relay:
+  runbooks:
+    # Directory of YAML runbooks (new failure types without code changes). Compose mounts ./runbooks here.
+    dir: ${RELAY_RUNBOOKS_DIR:}
   leader:
     # Lease-based leader election for running several backend instances: only the leader monitors and runs recovery,
     # the others forward those requests to it. Off by default (single instance); on in the postgres profile.
