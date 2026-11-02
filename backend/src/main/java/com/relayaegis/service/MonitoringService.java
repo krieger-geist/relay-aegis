@@ -204,6 +204,10 @@ public class MonitoringService {
         if ("action_taken".equals(incident.state) || "verifying".equals(incident.state)) {
             return "A recovery action is running for " + incident.id + "; its post-action verification decides the outcome.";
         }
+        List<String> firing = com.relayaegis.signals.SignalService.firingAlerts(incidentService.evidence(incident), check.checkedAt);
+        if (!firing.isEmpty()) {
+            return "RELAY's checks pass, but " + incident.id + " stays open while an external alert is still firing: " + firing.get(0) + ".";
+        }
         if (!MonitoringRules.hasRecoveryStreak(recent, recoveryThreshold, incident.detectedAt)) {
             return "Healthy check " + Math.min(MonitoringRules.leadingHealthy(recent), recoveryThreshold) + " of " + recoveryThreshold
                     + " required before " + incident.id + " is resolved.";

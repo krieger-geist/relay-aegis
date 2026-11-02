@@ -37,6 +37,7 @@ class SignalControllerTest {
     @Autowired MockMvc mvc;
     @Autowired ApplicationRepository applications;
     @Autowired IncidentRepository incidents;
+    @Autowired com.relayaegis.service.IncidentService incidentService;
     @MockitoBean GeminiClient gemini;
     @MockitoBean DockerCommandRunner docker;
 
@@ -82,6 +83,27 @@ class SignalControllerTest {
         assertThat(incident.state).isNotEqualTo("recovered");
         assertThat(incident.evidenceJson).contains("external_alert").contains("Alert resolved in alertmanager");
         assertThat(incidents.findByApplicationIdOrderByDetectedAtDesc(appId)).hasSize(1);
+    }
+
+    @Test
+    void anIncidentIsHeldOpenOnlyWhileItsAlertIsFiring() throws Exception {
+        mvc.perform(post("/api/signals/alertmanager").header("Authorization", TOKEN).contentType(MediaType.APPLICATION_JSON)
+                .content(alertmanager("firing", "fp-hold")));
+        IncidentEntity incident = incidents.findByApplicationIdOrderByDetectedAtDesc(appId).get(0);
+        assertThat(SignalService.firingAlerts(incidentService.evidence(incident), Instant.now())).containsExactly("Alert from alertmanager: 5xx rate above 5%");
+        assertThat(SignalService.firingAlerts(incidentService.evidence(incident), Instant.now().plus(SignalService.ALERT_TTL).plusSeconds(60)))
+                .as("an alert that stopped being repeated no longer holds the incident open").isEmpty();
+
+        mvc.perform(post("/api/signals/alertmanager").header("Authorization", TOKEN).contentType(MediaType.APPLICATION_JSON)
+                .content(alertmanager("resolved", "fp-hold")));
+        incident = incidents.findById(incident.id).orElseThrow();
+        assertThat(SignalService.firingAlerts(incidentService.evidence(incident), Instant.now())).isEmpty();
+
+        mvc.perform(post("/api/signals/alertmanager").header("Authorization", TOKEN).contentType(MediaType.APPLICATION_JSON)
+                        .content(alertmanager("firing", "fp-hold")))
+                .andExpect(jsonPath("$.data[0].result").value("attached"));
+        incident = incidents.findById(incident.id).orElseThrow();
+        assertThat(SignalService.firingAlerts(incidentService.evidence(incident), Instant.now())).hasSize(1);
     }
 
     @Test

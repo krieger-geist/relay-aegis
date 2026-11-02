@@ -12,10 +12,13 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,10 +28,17 @@ import org.springframework.transaction.annotation.Transactional;
  * incident for the application, or is added as evidence to the one already open; the normal pipeline then diagnoses
  * it from RELAY's own observations and the recovery policy decides. An alert never runs an action by itself, and a
  * "resolved" alert is only recorded: RELAY closes an incident after its own checks see the application healthy.
- * Repeated deliveries of the same alert state are recorded once.
+ * While an alert is still firing, the incident stays open even if RELAY's own checks pass (the alert may watch
+ * something the health check does not); a firing alert not repeated for {@link #ALERT_TTL} no longer holds it open.
+ * Repeated deliveries of the same alert state are recorded once (a still-firing alert at most once an hour).
  */
 @Service
 public class SignalService {
+    /** A firing alert keeps its incident open this long after it was last reported (Alertmanager repeats every 4h). */
+    public static final Duration ALERT_TTL = Duration.ofHours(6);
+    private static final Duration REFIRE_NOTE = Duration.ofHours(1);
+    private static final String PREFIX = "sig-";
+
     /** One alert, normalised from any source. {@code status} is {@code firing} or {@code resolved}. */
     public record Signal(String source, String fingerprint, String status, String title, String detail, String severity, String link,
                          Instant startsAt) {}
@@ -58,16 +68,21 @@ public class SignalService {
     @Transactional
     public Outcome receive(ApplicationEntity app, Signal signal) {
         boolean firing = !"resolved".equals(signal.status());
-        String evidenceId = "sig-" + digest(signal.source() + "|" + signal.fingerprint() + "|" + signal.status());
+        String alertKey = digest(signal.source() + "|" + signal.fingerprint());
+        // The id carries the alert and its state, so the latest state of each alert can be read back from the evidence.
+        String evidenceId = PREFIX + alertKey + "-" + (firing ? "f" : "r") + "-" + UUID.randomUUID().toString().substring(0, 6);
         String component = MonitoringService.componentFor(app);
         Optional<IncidentEntity> open = incidents.findOpenIncident(app.id, component);
         metrics.signalReceived(signal.source(), signal.status());
 
         if (open.isPresent()) {
             IncidentEntity incident = open.get();
-            if (incidents.evidence(incident).stream().anyMatch(e -> evidenceId.equals(e.id()))) return new Outcome(app.id, incident.id, "duplicate");
-            incidents.appendEvidence(incident, evidence(evidenceId, signal, firing ? "Alert from " + signal.source() + ": " + signal.title()
-                    : "Alert resolved in " + signal.source() + ": " + signal.title()));
+            AlertState last = latestStates(incidents.evidence(incident)).get(alertKey);
+            if (last != null && last.firing() == firing && (!firing || last.at().isAfter(Instant.now().minus(REFIRE_NOTE)))) {
+                return new Outcome(app.id, incident.id, "duplicate");
+            }
+            String verb = !firing ? "Alert resolved in " : last != null && last.firing() ? "Alert still firing in " : "Alert from ";
+            incidents.appendEvidence(incident, evidence(evidenceId, signal, verb + signal.source() + ": " + signal.title()));
             incidents.save(incident);
             return new Outcome(app.id, incident.id, firing ? "attached" : "resolved_noted");
         }
@@ -86,6 +101,28 @@ public class SignalService {
         incidents.save(incident);
         events.publishEvent(new IncidentDetectedEvent(created.id(), app.id));
         return new Outcome(app.id, created.id(), "opened");
+    }
+
+    private record AlertState(boolean firing, Instant at, String title) {}
+
+    /** Titles of the external alerts on this incident whose latest state is firing, reported within {@link #ALERT_TTL}. */
+    public static List<String> firingAlerts(List<EvidenceItemDto> evidence, Instant now) {
+        return latestStates(evidence).values().stream()
+                .filter(s -> s.firing() && s.at() != null && s.at().isAfter(now.minus(ALERT_TTL))).map(AlertState::title).toList();
+    }
+
+    private static Map<String, AlertState> latestStates(List<EvidenceItemDto> evidence) {
+        Map<String, AlertState> latest = new HashMap<>();
+        for (EvidenceItemDto item : evidence) {
+            String id = item.id();
+            // sig-<16 hex alert key>-<f|r>-<suffix>
+            if (id == null || !id.startsWith(PREFIX) || id.length() < PREFIX.length() + 19 || id.charAt(PREFIX.length() + 16) != '-') continue;
+            String key = id.substring(PREFIX.length(), PREFIX.length() + 16);
+            AlertState state = new AlertState(id.charAt(PREFIX.length() + 17) == 'f', item.timestamp(), item.title());
+            AlertState previous = latest.get(key);
+            if (previous == null || previous.at() == null || (state.at() != null && !state.at().isBefore(previous.at()))) latest.put(key, state);
+        }
+        return latest;
     }
 
     private static EvidenceItemDto evidence(String id, Signal signal, String title) {
