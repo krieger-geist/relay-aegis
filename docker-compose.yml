@@ -106,6 +106,17 @@ services:
       RELAY_SANDBOX_DOCKER_HOST: tcp://sandbox-proxy:2375
       # YAML runbooks from ./runbooks (new failure types without code changes), re-read every minute.
       RELAY_RUNBOOKS_DIR: /app/runbooks
+      # Alerts from Alertmanager, Sentry and webhooks (POST /api/signals/...). Blank: those endpoints are off.
+      RELAY_SIGNALS_TOKEN: ${RELAY_SIGNALS_TOKEN:-}
+      RELAY_SENTRY_CLIENT_SECRET: ${RELAY_SENTRY_CLIENT_SECRET:-}
+      RELAY_SENTRY_PROJECTS: "${RELAY_SENTRY_PROJECTS:-}"
+      # Slack messages and Approve/Reject buttons, and a generic notification webhook.
+      RELAY_SLACK_WEBHOOK_URL: ${RELAY_SLACK_WEBHOOK_URL:-}
+      RELAY_SLACK_SIGNING_SECRET: ${RELAY_SLACK_SIGNING_SECRET:-}
+      RELAY_SLACK_APPROVERS: "${RELAY_SLACK_APPROVERS:-}"
+      RELAY_NOTIFY_WEBHOOK_URL: ${RELAY_NOTIFY_WEBHOOK_URL:-}
+      RELAY_NOTIFY_WEBHOOK_SECRET: ${RELAY_NOTIFY_WEBHOOK_SECRET:-}
+      RELAY_PUBLIC_URL: "${RELAY_PUBLIC_URL:-http://localhost:5173}"
       RELAY_DOCKER_ALLOWED_CONTAINERS: "${RELAY_DOCKER_ALLOWED_CONTAINERS:-relay-aegis-test-target}"
       RELAY_DOCKER_INSPECT_CONTAINERS: "${RELAY_DOCKER_INSPECT_CONTAINERS:-}"
       RELAY_DOCKER_DEPENDENCIES: "${RELAY_DOCKER_DEPENDENCIES:-}"

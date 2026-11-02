@@ -8,6 +8,7 @@ import com.relayaegis.dto.ApiDtos.IncidentDto;
 import com.relayaegis.entity.ApplicationEntity;
 import com.relayaegis.entity.IncidentEntity;
 import com.relayaegis.entity.RecoveryActionEntity;
+import com.relayaegis.notify.RelayNotification;
 import com.relayaegis.observability.RelayMetrics;
 import com.relayaegis.recovery.ActionJournal;
 import com.relayaegis.recovery.RecoveryDecision;
@@ -27,6 +28,7 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -55,6 +57,7 @@ public class RecoveryOrchestrationService {
     private final RelayMetrics metrics;
     private final ActionJournal journal;
     private final LeaderElection leadership;
+    private final ApplicationEventPublisher events;
     private final Duration backoffBase;
     /** Process-local guard: one recovery per incident at a time (single backend instance). */
     private final Set<String> inFlight = ConcurrentHashMap.newKeySet();
@@ -62,7 +65,7 @@ public class RecoveryOrchestrationService {
     public RecoveryOrchestrationService(IncidentService incidents, ApplicationService applications, DiagnosisService diagnosis,
             RecoveryPolicyEngine policyEngine, RecoveryExecutor executor, VerificationEngine verification, RecoveryGuard guard,
             RecoveryEventService recoveryEvents, @Qualifier("incidentExecutor") Executor incidentExecutor, RelayMetrics metrics, ActionJournal journal,
-            LeaderElection leadership,
+            LeaderElection leadership, ApplicationEventPublisher events,
             @Value("${relay.recovery.retry-backoff-ms:5000}") long backoffMs) {
         this.incidents = incidents;
         this.applications = applications;
@@ -76,6 +79,7 @@ public class RecoveryOrchestrationService {
         this.metrics = metrics;
         this.journal = journal;
         this.leadership = leadership;
+        this.events = events;
         this.backoffBase = Duration.ofMillis(Math.max(0, Math.min(60_000, backoffMs)));
     }
 
@@ -126,6 +130,10 @@ public class RecoveryOrchestrationService {
             if (!decision.authorized()) {
                 inFlight.remove(incidentId);
                 if (automatic && !decision.action().mutates()) return incidents.get(incidentId);
+                if (automatic && decision.requiresApproval()) {
+                    notify(RelayNotification.Kind.APPROVAL_REQUIRED, incident, app.environment, decision,
+                            decision.blockedReason() == null ? "The recovery policy requires an operator to approve this action." : decision.blockedReason());
+                }
                 throw new ResponseStatusException(decision.requiresApproval() || !decision.action().mutates() ? HttpStatus.CONFLICT : HttpStatus.FORBIDDEN,
                         decision.blockedReason());
             }
@@ -272,6 +280,17 @@ public class RecoveryOrchestrationService {
                 passed ? "recovery_verified" : ("timed_out".equals(verificationStatus) ? "needs_review" : "recovery_failed"),
                 incident.detectionDurationMs, incident.recoveryDurationMs,
                 outcome.detail() + " Attempts: " + attempts + ". Policy: " + decision.policyId() + " (" + decision.policyMode() + ").", "live");
+        notify(passed ? RelayNotification.Kind.RECOVERY_VERIFIED : RelayNotification.Kind.RECOVERY_FAILED, incident,
+                applications.findEntity(incident.applicationId).environment, decision, outcome.detail() + " Attempts: " + attempts + ".");
+    }
+
+    private void notify(RelayNotification.Kind kind, IncidentEntity incident, String environment, RecoveryDecision decision, String detail) {
+        try {
+            events.publishEvent(new RelayNotification(kind, incident.id, incident.applicationName, environment, incident.severity, incident.title,
+                    incident.summary, String.valueOf(decision.action()), decision.target(), detail, Instant.now()));
+        } catch (RuntimeException ex) {
+            log.warn("Notification for {} could not be published: {}", incident.id, ex.getClass().getSimpleName());
+        }
     }
 
     /**

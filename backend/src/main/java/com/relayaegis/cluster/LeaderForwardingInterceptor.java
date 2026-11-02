@@ -25,7 +25,8 @@ public class LeaderForwardingInterceptor implements HandlerInterceptor {
     static final String FORWARDED = "X-Relay-Forwarded-By";
     private static final Logger log = LoggerFactory.getLogger(LeaderForwardingInterceptor.class);
     private static final List<String> COPIED = List.of("Authorization", "Content-Type", "Accept", "Origin", "X-Relay-Client",
-            "Sentry-Hook-Signature", "Sentry-Hook-Resource", "Sentry-Hook-Timestamp");
+            "Sentry-Hook-Signature", "Sentry-Hook-Resource", "Sentry-Hook-Timestamp",
+            "X-Slack-Signature", "X-Slack-Request-Timestamp");
 
     private final LeaderElection election;
     private final RestClient client;

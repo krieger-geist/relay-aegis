@@ -96,7 +96,7 @@ class RecoveryOrchestrationServiceTest {
         when(policies.findById("policy-restart")).thenReturn(Optional.of(policy));
         RecoveryPolicyEngine engine = new RecoveryPolicyEngine(policies, docker, guard);
         return new RecoveryOrchestrationService(incidents, applications, diagnosis, engine, executor, verification, guard, events, workers, new RelayMetrics(meters),
-                new ActionJournal(actions), leadership, 0);
+                new ActionJournal(actions), leadership, event -> {}, 0);
     }
 
     private void diagnosed(RecoveryActionType action, double confidence) {

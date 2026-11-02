@@ -83,6 +83,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/actuator/prometheus").permitAll()
                 // Alert webhooks are called by other tools, not users; SignalController verifies each one's token or signature.
                 .requestMatchers(HttpMethod.POST, "/api/signals/**").permitAll()
+                // Slack button clicks; SlackInteractionController verifies Slack's signature and the approver list.
+                .requestMatchers(HttpMethod.POST, "/api/slack/interactions").permitAll()
                 .requestMatchers("/error").permitAll()
                 .anyRequest().authenticated())
             .exceptionHandling(errors -> errors
