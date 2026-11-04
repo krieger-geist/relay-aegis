@@ -204,6 +204,10 @@ public class MonitoringService {
         if ("action_taken".equals(incident.state) || "verifying".equals(incident.state)) {
             return "A recovery action is running for " + incident.id + "; its post-action verification decides the outcome.";
         }
+        List<String> firing = com.relayaegis.signals.SignalService.firingAlerts(incidentService.evidence(incident), check.checkedAt);
+        if (!firing.isEmpty()) {
+            return "RELAY's checks pass, but " + incident.id + " stays open while an external alert is still firing: " + firing.get(0) + ".";
+        }
         if (!MonitoringRules.hasRecoveryStreak(recent, recoveryThreshold, incident.detectedAt)) {
             return "Healthy check " + Math.min(MonitoringRules.leadingHealthy(recent), recoveryThreshold) + " of " + recoveryThreshold
                     + " required before " + incident.id + " is resolved.";
@@ -214,7 +218,8 @@ public class MonitoringService {
         return "Incident " + incident.id + " resolved after observed recovery.";
     }
 
-    private static String componentFor(ApplicationEntity app) {
+    /** The incident component for an application: its container when linked, else its URL health check. */
+    public static String componentFor(ApplicationEntity app) {
         return app.dockerContainer != null && !app.dockerContainer.isBlank() ? "docker:" + app.dockerContainer : "url-health-check";
     }
 

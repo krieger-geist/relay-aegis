@@ -554,7 +554,7 @@ public class DiagnosisService {
                     };
             String label = TRIGGER_AUTOMATIC.equals(result.trigger()) ? "Automatic diagnosis" : "Diagnosis (manual re-run)";
             incidents.updateTimelineStep(incident, 2, label, detail, "completed", ai ? "ai" : "system", Instant.now());
-            repository.save(incident);
+            incidents.save(incident);
         });
     }
 
@@ -585,7 +585,7 @@ public class DiagnosisService {
                 incident.state = "diagnosing";
                 incident.status = "diagnosing";
             }
-            repository.save(incident);
+            incidents.save(incident);
         });
     }
 
@@ -600,7 +600,7 @@ public class DiagnosisService {
                     incident.state = "unresolved";
                     incident.status = "active_incident";
                 }
-                repository.save(incident);
+                incidents.save(incident);
             });
         } catch (RuntimeException ignored) { /* The original failure is reported by the caller. */ }
     }

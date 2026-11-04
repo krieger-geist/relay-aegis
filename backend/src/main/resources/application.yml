@@ -44,6 +44,31 @@ management:
         enabled: true
       show-details: when_authorized
 relay:
+  signals:
+    # Alert webhooks (/api/signals/alertmanager, /webhook): callers send "Authorization: Bearer <token>" (24+ characters).
+    # Blank: those endpoints are off.
+    token: ${RELAY_SIGNALS_TOKEN:}
+    # Sentry integration client secret, used to verify Sentry-Hook-Signature. Blank: /api/signals/sentry is off.
+    sentry-client-secret: ${RELAY_SENTRY_CLIENT_SECRET:}
+    # Sentry project slug to RELAY application (id, name or container): "orders-api=orders-service,web=storefront".
+    sentry-projects: ${RELAY_SENTRY_PROJECTS:}
+  slack:
+    # Slack incoming webhook (https://hooks.slack.com/...) for incidents and recovery outcomes. Blank: no Slack messages.
+    webhook-url: ${RELAY_SLACK_WEBHOOK_URL:}
+    # Approve/Reject buttons need the Slack app's signing secret (Interactivity Request URL: <RELAY>/api/slack/interactions)
+    # and the Slack user ids allowed to approve ("U012AB3CD,U045EF6GH"). Either blank: messages only, no buttons.
+    signing-secret: ${RELAY_SLACK_SIGNING_SECRET:}
+    approvers: ${RELAY_SLACK_APPROVERS:}
+  notify:
+    # Any URL that should receive every notification as JSON. With a secret, requests carry
+    # X-Relay-Signature: sha256=HMAC(secret, "<X-Relay-Timestamp>.<body>").
+    webhook-url: ${RELAY_NOTIFY_WEBHOOK_URL:}
+    webhook-secret: ${RELAY_NOTIFY_WEBHOOK_SECRET:}
+  # The address people open RELAY at (links in Slack and webhook messages), e.g. https://relay.example.com
+  public-url: ${RELAY_PUBLIC_URL:}
+  runbooks:
+    # Directory of YAML runbooks (new failure types without code changes). Compose mounts ./runbooks here.
+    dir: ${RELAY_RUNBOOKS_DIR:}
   leader:
     # Lease-based leader election for running several backend instances: only the leader monitors and runs recovery,
     # the others forward those requests to it. Off by default (single instance); on in the postgres profile.

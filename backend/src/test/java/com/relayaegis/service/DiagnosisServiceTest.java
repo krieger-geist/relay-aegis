@@ -194,7 +194,7 @@ class DiagnosisServiceTest {
 
     private IncidentEntity savedIncident() {
         ArgumentCaptor<IncidentEntity> saved = ArgumentCaptor.forClass(IncidentEntity.class);
-        verify(repository).save(saved.capture());
+        verify(incidents, org.mockito.Mockito.atLeastOnce()).save(saved.capture());
         return saved.getValue();
     }
 

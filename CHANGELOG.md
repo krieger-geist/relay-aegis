@@ -5,6 +5,49 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-04
+
+Pluggable core release (roadmap Phase 2). New failure types are YAML files, not Java changes; alerts from the tools a
+team already runs open incidents; and RELAY reports to Slack, where approvers can approve or reject a recovery.
+
+Verified live on Compose: a `connection-pool-exhausted` runbook, added as a file, matched its failure at confidence 0.96
+and healed it (detected in 5.2 s, recovered in 10.7 s); an Alertmanager alert held its incident open through 19 passing
+health checks and the incident closed 7 s after the alert resolved.
+
+### Added
+- **Runbooks as code.** `*.yaml` files in `runbooks/` (`RELAY_RUNBOOKS_DIR`) describe what must match (container
+  state, log patterns, failed health checks, an unhealthy dependency), the cause and one action from the closed set.
+  They are validated on load and re-read every minute; `GET /api/runbooks` shows what loaded and why a file was
+  rejected, `POST /api/runbooks/reload` reloads at once. Each finding names the runbook file and its SHA-256. Two
+  examples ship: `connection-pool-exhausted` and `disk-full`.
+- **Alerts from other tools.** `POST /api/signals/alertmanager` (also Grafana's webhook contact point) and
+  `/api/signals/webhook` with a bearer token (`RELAY_SIGNALS_TOKEN`), and `/api/signals/sentry` verified by the
+  integration's HMAC signature (`RELAY_SENTRY_CLIENT_SECRET`, project mapping in `RELAY_SENTRY_PROJECTS`). A firing
+  alert opens an incident or is added to the open one; repeats are recorded once, a still-firing alert at most hourly.
+  `relay_signals_received_total` counts them.
+- **Slack.** Messages when an incident opens, when recovery needs approval and when it is verified or not
+  (`RELAY_SLACK_WEBHOOK_URL`). With `RELAY_SLACK_SIGNING_SECRET` and `RELAY_SLACK_APPROVERS`, approval messages get
+  Approve / Reject buttons, handled at `POST /api/slack/interactions`.
+- **Outbound webhook** (`RELAY_NOTIFY_WEBHOOK_URL`) with every notification as JSON, signed with
+  `X-Relay-Signature: sha256=HMAC(secret, "<timestamp>.<body>")` when `RELAY_NOTIFY_WEBHOOK_SECRET` is set.
+- `RELAY_PUBLIC_URL` for incident links in messages.
+- [Integrations guide](docs/INTEGRATIONS.md) for Alertmanager, Grafana, Sentry, Slack and the webhook.
+
+### Changed
+- An incident opened or extended by an external alert stays open while that alert is still firing, even when RELAY's
+  own checks pass; an alert that never resolves stops holding it after 6 hours.
+
+### Fixed
+- Concurrent writers (the monitor, diagnosis, recovery and incoming alerts) could overwrite each other's incident
+  evidence. Evidence is now merged by id under a row lock.
+
+### Security
+- Slack clicks are refused unless signed with the app's signing secret over the raw body, less than five minutes old,
+  and from a listed approver. An approval runs the normal operator recovery, so policy, guard, journal and verification
+  still apply; Production incidents never get buttons, and alert text is escaped so it cannot add mentions or links.
+- Signal endpoints compare credentials in constant time, cap request size, and are off until their credential is set.
+- Outbound notifications never follow redirects; the Slack URL must be on `hooks.slack.com`.
+
 ## [1.1.0] - 2026-10-31
 
 Reliability and observability release (roadmap Phase 1). RELAY can now run as several instances with exactly one
@@ -74,6 +117,7 @@ First public release: the Sentry × Dezyne E'cole Hackathon 2026 system, with re
 ### Changed
 - Frontend image installs dependencies with `npm ci` from the lockfile for reproducible builds.
 
-[Unreleased]: https://github.com/krieger-geist/relay-aegis/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/krieger-geist/relay-aegis/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/krieger-geist/relay-aegis/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/krieger-geist/relay-aegis/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/krieger-geist/relay-aegis/releases/tag/v1.0.0

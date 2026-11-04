@@ -1,0 +1,20 @@
+# A full disk or volume. A container restart keeps its filesystem, so it would not help: escalate to a human.
+id: disk-full
+title: Disk or volume full
+category: runtime
+confidence: 0.95
+cause: The application cannot write because its disk or volume is full.
+explanation: >-
+  The logs show writes failing with "no space left on device". Restarting would not free any space.
+match:
+  failing: true
+  logs:
+    patterns:
+      - 'no space left on device'
+      - 'ENOSPC'
+      - 'disk quota exceeded'
+action:
+  type: ESCALATE
+  text: >-
+    Free space on the volume (old logs, temporary files) or grow it, then confirm the application recovers.
+    No automatic action: a restart keeps the same full filesystem.
