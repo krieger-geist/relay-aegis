@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: RELAY AEGIS API
-  version: 1.0.0
+  version: 1.2.0
   description: >-
     Evidence-driven self-healing API: monitoring, deterministic diagnosis, policy-gated runtime recovery,
     live URL and GitHub assessment, sandbox-validated Auto-Repair and approval-gated pull requests.
@@ -352,8 +352,102 @@ paths:
       responses:
         '200': {description: OK}
         '401': {description: Missing or invalid access token}
+  /api/runbooks:
+    get:
+      summary: YAML runbooks loaded on this instance, with the reason any file was rejected
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+  /api/runbooks/reload:
+    post:
+      summary: Re-read the runbook files now
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+  /api/signals/alertmanager:
+    post:
+      summary: Alertmanager (or Grafana) webhook; firing alerts open or extend incidents
+      security: [{signalToken: []}]
+      parameters:
+        - {name: application, in: query, required: false, schema: {type: string}, description: RELAY application id, name or container}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, description: Alertmanager webhook payload (version 4)}
+      responses:
+        '202': {description: One result per alert}
+        '401': {description: Missing or wrong token}
+        '404': {description: RELAY_SIGNALS_TOKEN not set}
+  /api/signals/sentry:
+    post:
+      summary: Sentry integration webhook (issue, event_alert, metric_alert), verified by Sentry-Hook-Signature
+      security: []
+      parameters:
+        - {name: Sentry-Hook-Signature, in: header, required: true, schema: {type: string}}
+        - {name: Sentry-Hook-Resource, in: header, required: false, schema: {type: string}}
+        - {name: application, in: query, required: false, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object}
+      responses:
+        '202': {description: Result}
+        '401': {description: Signature does not match}
+        '404': {description: RELAY_SENTRY_CLIENT_SECRET not set}
+  /api/signals/webhook:
+    post:
+      summary: Generic alert from any tool
+      security: [{signalToken: []}]
+      parameters:
+        - {name: application, in: query, required: false, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                application: {type: string}
+                title: {type: string}
+                status: {type: string, enum: [firing, resolved]}
+                detail: {type: string}
+                severity: {type: string}
+                fingerprint: {type: string}
+                link: {type: string}
+                startsAt: {type: string, format: date-time}
+      responses:
+        '202': {description: Result}
+        '400': {description: title missing}
+        '401': {description: Missing or wrong token}
+        '404': {description: RELAY_SIGNALS_TOKEN not set}
+  /api/slack/interactions:
+    post:
+      summary: Slack interactivity Request URL for the Approve / Reject buttons
+      security: []
+      parameters:
+        - {name: X-Slack-Signature, in: header, required: true, schema: {type: string}}
+        - {name: X-Slack-Request-Timestamp, in: header, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                payload: {type: string, description: Slack block_actions JSON}
+      responses:
+        '200': {description: Accepted; the outcome replaces the Slack message}
+        '401': {description: Signature invalid or timestamp older than five minutes}
+        '404': {description: Slack approvals not configured}
 components:
   securitySchemes:
+    signalToken:
+      type: http
+      scheme: bearer
+      description: RELAY_SIGNALS_TOKEN
     bearerAuth:
       type: http
       scheme: bearer

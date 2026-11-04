@@ -21,7 +21,7 @@ and policy-gated, and AI only proposes. That is exactly what stops companies tru
 - Deterministic diagnosis with ranked hypotheses and labelled evidence (Observed / Inferred / Hypothesis).
 - Policy, guard (attempts, cooldown, circuit breaker) and post-action verification on every recovery.
 - Sandbox validation, security re-scan, approver allowlist and PR-only code changes.
-- 425 backend tests (including PostgreSQL integration tests), 170 frontend tests, typed frontend, Flyway migrations, OpenAPI spec.
+- 477 backend tests (including PostgreSQL integration tests), 170 frontend tests, typed frontend, Flyway migrations, OpenAPI spec.
 
 ## Gaps against industry standards
 
@@ -32,8 +32,8 @@ and policy-gated, and AI only proposes. That is exactly what stops companies tru
 | Observability of RELAY | Actuator only; no Prometheus metrics, traces or structured logs | Must fit into their existing monitoring |
 | Platforms | Docker on one host only | Most companies run Kubernetes or a cloud |
 | Signals | Health checks, container state and logs only; corrupt data with green health is missed | Real incidents show up first in error rates, latency and user flows |
-| Integrations | No Slack, PagerDuty, Alertmanager, Sentry or webhook in/out | It has to plug into the on-call workflow |
-| Runbooks | Recovery actions and policy live in code and env variables | Teams want reviewed, versioned runbooks as code |
+| Integrations | Done in Phase 2 (v1.2.0): Alertmanager, Sentry and webhook in; Slack (with approvals) and signed webhook out. PagerDuty and email still missing | It has to plug into the on-call workflow |
+| Runbooks | Done in Phase 2 (v1.2.0): YAML runbooks in Git, validated on load | Teams want reviewed, versioned runbooks as code |
 | Code healing | Two fix strategies; personal access token | Breadth, and GitHub App auth is the standard |
 | Proof | Results from rehearsals, not continuous measurement | MTTD/MTTR trends and SLOs are how reliability is judged |
 | Product | Single tenant, local accounts | Teams, SSO and audit export are required to adopt |
@@ -63,7 +63,15 @@ took over in 17.5 s, re-verified instead of repeating the action, and closed the
 
 **Done when:** killing one RELAY instance mid-repair loses no incident and repeats no action (tested by chaos).
 
-### Phase 2: Pluggable core for a wide domain (3–4 weeks)
+### Phase 2: Pluggable core for a wide domain (3–4 weeks) · done (v1.2.0)
+Done: YAML runbooks (`runbooks/`, re-read every minute, each incident records the file's SHA-256); alerts from
+Alertmanager (and Grafana's webhook contact point), Sentry and a generic webhook, with a firing alert holding its
+incident open; Slack messages with Approve / Reject buttons (signed, approver allowlist, recorded as evidence, never
+for Production) and a signed outbound webhook. Verified live on Compose: the `connection-pool-exhausted` runbook,
+added as a file, healed its failure (detected in 5.2 s, recovered in 10.7 s) with no Java change.
+Moved on: synthetic journeys and Prometheus queries to Phase 4, the Kubernetes executor to Phase 3, email and
+PagerDuty to Phase 7.
+
 Turn the engine into three interfaces so new environments are adapters, not rewrites:
 - **Signal sources:** HTTP health, synthetic user journeys, Prometheus queries, log patterns, inbound webhooks
   (Alertmanager, Sentry, Grafana).
@@ -103,6 +111,7 @@ Turn the engine into three interfaces so new environments are adapters, not rewr
 ### Phase 7: Product readiness
 - Organisations, teams and role-based access per system; OIDC single sign-on.
 - Audit log export; data retention settings; hardened deployment guide.
+- More notifiers: email and PagerDuty (Events API v2), next to Slack and the webhook.
 - Documentation site, one-command install, hosted read-only demo.
 
 ## Who works on this problem
