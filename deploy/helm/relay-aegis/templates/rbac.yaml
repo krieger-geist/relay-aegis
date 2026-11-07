@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}
+  labels: {{- include "relay.labels" . | nindent 4 }}
+{{- range .Values.kubernetes.namespaces }}
+---
+# Exactly the calls RELAY makes. No create, no secrets, no exec, nothing at cluster level.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $.Release.Name }}-recovery
+  namespace: {{ . }}
+  labels: {{- include "relay.labels" $ | nindent 4 }}
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "patch", "update"]
+  - apiGroups: ["apps"]
+    resources: ["deployments/scale"]
+    verbs: ["get", "patch", "update"]
+  - apiGroups: ["apps"]
+    resources: ["replicasets"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $.Release.Name }}-recovery
+  namespace: {{ . }}
+  labels: {{- include "relay.labels" $ | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $.Release.Name }}-recovery
+subjects:
+  - kind: ServiceAccount
+    name: {{ $.Release.Name }}
+    namespace: {{ $.Release.Namespace }}
+{{- end }}

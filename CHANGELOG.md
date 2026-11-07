@@ -5,6 +5,38 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-07
+
+Kubernetes release (roadmap Phase 3). RELAY now runs in a cluster from a Helm chart and repairs Deployments with
+namespace-scoped permissions.
+
+Verified on a kind cluster (Kubernetes v1.34.0): five real failures healed and verified, each in under 47 s, with fast
+test timings. Rollback of a bad rollout took 14.3 s and 31.6 s in that run, with no outage seen from outside.
+[Results and caveats](docs/KUBERNETES.md#measured-results).
+
+### Added
+- **Kubernetes targets.** An application's target can be `k8s:<namespace>/<deployment>`. Diagnosis, verification and the
+  dependency graph read it through the same interface as Docker.
+- **New actions:** `ROLLOUT_UNDO`, `SCALE_WORKLOAD` and `DELETE_POD`, with their own policies, all starting at
+  `require_approval`. On Kubernetes, the restart actions are rollout restarts. Only Deployments listed in
+  `kubernetes.allowedWorkloads` can be changed.
+- **Kubernetes findings:** scaled to zero, image pull failure, bad rollout, unschedulable, one pod unready and all pods
+  unready.
+- **Kubernetes signals.** The leader polls watched Deployments, and failures such as `CrashLoopBackOff` and `OOMKilled`
+  open an incident and hold it open even while the health URL answers.
+- **Helm chart** in `deploy/helm/relay-aegis`: namespaced Role only, no ClusterRole, non-root containers.
+- **`scripts/k8s-e2e.sh`** and a CI workflow that break a real Deployment on kind five ways and measure recovery.
+- [Kubernetes guide](docs/KUBERNETES.md).
+- `scripts/live-demo.ps1` shares a running RELAY through a temporary Cloudflare quick tunnel.
+
+### Changed
+- A passing health check no longer clears a Kubernetes workload whose pods are failing: old pods can keep answering
+  during a bad rollout. Verification on Kubernetes waits for the latest rollout to complete.
+
+### Not included
+- Cordon, which was on the roadmap, because it needs cluster-wide permissions.
+- A cluster test of dependency failure, because the test application has no database. Unit tests cover it.
+
 ## [1.2.0] - 2026-11-04
 
 Pluggable core release (roadmap Phase 2). New failure types are YAML files, not Java changes; alerts from the tools a

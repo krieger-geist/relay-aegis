@@ -5,6 +5,8 @@ import com.relayaegis.dto.ApiDtos.IntegrationConnections;
 import com.relayaegis.dto.ApiDtos.RegisterApplicationRequest;
 import com.relayaegis.entity.ApplicationEntity;
 import com.relayaegis.repository.ApplicationRepository;
+import com.relayaegis.runtime.kubernetes.KubernetesControlService;
+import com.relayaegis.runtime.kubernetes.KubernetesTarget;
 import com.relayaegis.util.TargetUrlPolicy;
 import java.time.Instant;
 import java.util.List;
@@ -19,11 +21,13 @@ public class ApplicationService {
     private final ApplicationRepository applications;
     private final TargetUrlPolicy targetUrlPolicy;
     private final DockerControlService docker;
+    private final KubernetesControlService kubernetes;
 
-    public ApplicationService(ApplicationRepository applications, TargetUrlPolicy targetUrlPolicy, DockerControlService docker) {
+    public ApplicationService(ApplicationRepository applications, TargetUrlPolicy targetUrlPolicy, DockerControlService docker, KubernetesControlService kubernetes) {
         this.applications = applications;
         this.targetUrlPolicy = targetUrlPolicy;
         this.docker = docker;
+        this.kubernetes = kubernetes;
         // Per-application Docker/GitHub state remains unverified until the specific resource can be checked.
     }
 
@@ -58,7 +62,11 @@ public class ApplicationService {
             if ("Production".equalsIgnoreCase(entity.environment)) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Production applications cannot be linked to automated Docker recovery.");
             }
-            if (!docker.isEnabled() || !docker.isAllowed(container)) {
+            if (KubernetesTarget.is(container)) {
+                if (!kubernetes.isEnabled() || !kubernetes.isAllowed(container)) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "The Kubernetes target must be enabled and explicitly included in RELAY_KUBERNETES_ALLOWED_WORKLOADS.");
+                }
+            } else if (!docker.isEnabled() || !docker.isAllowed(container)) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "The Docker target must be enabled and explicitly included in RELAY_DOCKER_ALLOWED_CONTAINERS.");
             }
             entity.dockerContainer = container;

@@ -220,7 +220,8 @@ public class MonitoringService {
 
     /** The incident component for an application: its container when linked, else its URL health check. */
     public static String componentFor(ApplicationEntity app) {
-        return app.dockerContainer != null && !app.dockerContainer.isBlank() ? "docker:" + app.dockerContainer : "url-health-check";
+        if (app.dockerContainer == null || app.dockerContainer.isBlank()) return "url-health-check";
+        return com.relayaegis.runtime.kubernetes.KubernetesTarget.is(app.dockerContainer) ? app.dockerContainer : "docker:" + app.dockerContainer;
     }
 
     /**

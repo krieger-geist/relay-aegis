@@ -5,6 +5,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import com.relayaegis.runtime.kubernetes.KubernetesControlService;
+import com.relayaegis.runtime.kubernetes.KubernetesTarget;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -22,13 +25,20 @@ import org.springframework.stereotype.Component;
 public class DependencyGraphService {
     private final DockerCommandRunner runner;
     private final DockerControlService docker;
+    private final KubernetesControlService kubernetes;
     private final Map<String, List<String>> configured;
 
+    public DependencyGraphService(DockerCommandRunner runner, DockerControlService docker, String configuredDependencies) {
+        this(runner, docker, configuredDependencies, KubernetesControlService.disabled());
+    }
+
+    @Autowired
     public DependencyGraphService(DockerCommandRunner runner, DockerControlService docker,
-            @Value("${relay.docker.dependencies:}") String configuredDependencies) {
+            @Value("${relay.docker.dependencies:}") String configuredDependencies, KubernetesControlService kubernetes) {
         this.runner = runner;
         this.docker = docker;
         this.configured = parse(configuredDependencies);
+        this.kubernetes = kubernetes;
     }
 
     public record DependencyNode(String name, String container, String source, boolean inspectable, boolean recoveryAllowed) {}
@@ -53,6 +63,11 @@ public class DependencyGraphService {
     public List<DependencyNode> dependenciesOf(String appContainer, ContainerSnapshot appSnapshot) {
         Map<String, DependencyNode> nodes = new LinkedHashMap<>();
         if (appContainer == null) return List.of();
+        if (KubernetesTarget.is(appContainer)) {
+            return kubernetes.dependenciesOf(appContainer).stream()
+                    .map(dep -> new DependencyNode(KubernetesTarget.parse(dep).map(KubernetesTarget::deployment).orElse(dep), dep, "configured", kubernetes.canInspect(dep), kubernetes.isAllowed(dep)))
+                    .toList();
+        }
         for (String dep : configured.getOrDefault(appContainer, List.of())) {
             nodes.putIfAbsent(dep, node(dep, dep, "configured"));
         }

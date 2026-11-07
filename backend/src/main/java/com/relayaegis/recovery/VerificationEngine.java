@@ -3,7 +3,7 @@ package com.relayaegis.recovery;
 import com.relayaegis.dto.ApiDtos.HealthCheckResult;
 import com.relayaegis.entity.ApplicationEntity;
 import com.relayaegis.runtime.ContainerSnapshot;
-import com.relayaegis.runtime.DockerRuntimeInspector;
+import com.relayaegis.runtime.RuntimeInspector;
 import com.relayaegis.service.MonitoringService;
 import java.time.Duration;
 import java.time.Instant;
@@ -20,12 +20,12 @@ import org.springframework.stereotype.Component;
 @Component
 public class VerificationEngine {
     private final MonitoringService monitoring;
-    private final DockerRuntimeInspector inspector;
+    private final RuntimeInspector inspector;
     private final Duration timeout;
     private final int requiredHealthyChecks;
     private final Duration pollInterval;
 
-    public VerificationEngine(MonitoringService monitoring, DockerRuntimeInspector inspector,
+    public VerificationEngine(MonitoringService monitoring, RuntimeInspector inspector,
             @Value("${relay.recovery.verification.timeout-ms:30000}") long timeoutMs,
             @Value("${relay.recovery.verification.required-healthy-checks:2}") int requiredHealthyChecks,
             @Value("${relay.recovery.verification.poll-ms:1000}") long pollMs) {

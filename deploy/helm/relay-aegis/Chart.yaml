@@ -1,0 +1,6 @@
+apiVersion: v2
+name: relay-aegis
+description: Self-healing for applications, with evidence-based diagnosis, policy-gated recovery and verification.
+type: application
+version: 1.3.0
+appVersion: "1.3.0"

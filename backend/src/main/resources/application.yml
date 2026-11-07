@@ -97,6 +97,16 @@ relay:
     failure-threshold: ${RELAY_MONITORING_FAILURE_THRESHOLD:2}
     recovery-threshold: ${RELAY_MONITORING_RECOVERY_THRESHOLD:2}
     allowed-hosts: ${RELAY_MONITORING_ALLOWED_HOSTS:localhost,127.0.0.1,host.docker.internal,test-target}
+  # Kubernetes runtime: targets are written k8s:<namespace>/<deployment>. Off unless enabled; RBAC limits it again.
+  kubernetes:
+    enabled: ${RELAY_KUBERNETES_ENABLED:false}
+    allowed-workloads: ${RELAY_KUBERNETES_ALLOWED_WORKLOADS:}
+    inspect-workloads: ${RELAY_KUBERNETES_INSPECT_WORKLOADS:}
+    # k8s:ns/app=k8s:ns/db|k8s:ns/cache;k8s:ns/worker=k8s:ns/queue
+    dependencies: ${RELAY_KUBERNETES_DEPENDENCIES:}
+    # Replicas to go back to when a workload was found scaled to zero.
+    restore-replicas: ${RELAY_KUBERNETES_RESTORE_REPLICAS:1}
+    signal-interval-ms: ${RELAY_KUBERNETES_SIGNAL_INTERVAL_MS:15000}
   recovery:
     docker:
       enabled: ${RELAY_RECOVERY_DOCKER_ENABLED:false}

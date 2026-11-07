@@ -1,0 +1,47 @@
+name: Kubernetes end-to-end
+
+on:
+  push:
+    branches: [main, "phase*/**"]
+  pull_request:
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - "test-target/**"
+      - "deploy/**"
+      - "scripts/k8s-e2e.sh"
+      - ".github/workflows/kubernetes-e2e.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: k8s-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  heal-on-kind:
+    name: Heal real failures on kind
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.19.0
+      - name: Install kind
+        run: |
+          curl -fsSL -o kind https://github.com/kubernetes-sigs/kind/releases/download/v0.30.0/kind-linux-amd64
+          chmod +x kind
+          sudo mv kind /usr/local/bin/kind
+      - name: Lint the chart
+        run: helm lint deploy/helm/relay-aegis
+      - name: Break things and prove they heal
+        run: scripts/k8s-e2e.sh
+      - name: Keep the measured times
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kubernetes-e2e-results
+          path: chaos/results/kubernetes-*.md

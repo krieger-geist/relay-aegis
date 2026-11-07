@@ -17,7 +17,7 @@ import com.relayaegis.entity.IncidentEntity;
 import com.relayaegis.repository.ApplicationRepository;
 import com.relayaegis.repository.IncidentRepository;
 import com.relayaegis.runtime.ContainerSnapshot;
-import com.relayaegis.runtime.DockerRuntimeInspector;
+import com.relayaegis.runtime.RuntimeInspector;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
@@ -36,10 +36,10 @@ public class AssessmentDiagnosisService {
     private final ApplicationRepository applications;
     private final IncidentRepository incidents;
     private final IncidentFindingService incidentFindings;
-    private final DockerRuntimeInspector inspector;
+    private final RuntimeInspector inspector;
 
     public AssessmentDiagnosisService(RepairStates repairStates, ApplicationRepository applications, IncidentRepository incidents,
-                                      IncidentFindingService incidentFindings, DockerRuntimeInspector inspector) {
+                                      IncidentFindingService incidentFindings, RuntimeInspector inspector) {
         this.repairStates = repairStates;
         this.applications = applications;
         this.incidents = incidents;

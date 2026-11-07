@@ -43,6 +43,7 @@ public class RecoveryPolicyService {
      * mode an operator chose - are never modified. Dependency recovery is opt-in: it starts disabled.
      */
     public void seedDefaultsIfEmpty() {
+        seedKubernetes();
         if (!policies.existsById("policy-restart")) {
             save("policy-restart", "Restart an unhealthy container", "Start or restart only explicitly allowlisted containers after policy approval; every action is verified afterwards.", "require_approval", "high", "Configured non-production container allowlist");
         }
@@ -51,6 +52,17 @@ public class RecoveryPolicyService {
         }
         if (!policies.existsById("policy-network-reconnect")) {
             save("policy-network-reconnect", "Reconnect a detached dependency to its network", "Reattach an allowlisted, healthy dependency to its own Compose project network under its service alias when the deterministic diagnosis finds it detached; the application is verified afterwards.", "disabled", "medium", "Allowlisted dependency containers, same Compose project network only (opt-in)");
+        }
+    }
+    private void seedKubernetes() {
+        if (!policies.existsById("policy-kubernetes-rollback")) {
+            save("policy-kubernetes-rollback", "Roll back a bad Kubernetes rollout", "Go back to the previous revision of an allowlisted Deployment when the deterministic diagnosis finds the current revision cannot pull its image or crash loops right after a rollout.", "require_approval", "high", "Allowlisted Deployments, RBAC-limited namespaces");
+        }
+        if (!policies.existsById("policy-kubernetes-scale")) {
+            save("policy-kubernetes-scale", "Scale up a workload found at zero", "Scale an allowlisted Deployment found at zero replicas back to the configured replica count.", "require_approval", "medium", "Allowlisted Deployments, RBAC-limited namespaces");
+        }
+        if (!policies.existsById("policy-kubernetes-delete-pod")) {
+            save("policy-kubernetes-delete-pod", "Replace one bad pod", "Delete one unready pod of an allowlisted Deployment while at least one sibling stays ready, so the Deployment replaces it.", "require_approval", "low", "Allowlisted Deployments, RBAC-limited namespaces");
         }
     }
     private void save(String id, String action, String description, String mode, String risk, String scope) {

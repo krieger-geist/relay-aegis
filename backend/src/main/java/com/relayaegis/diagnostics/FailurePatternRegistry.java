@@ -8,6 +8,7 @@ import com.relayaegis.diagnostics.patterns.CrashLoopPattern;
 import com.relayaegis.diagnostics.patterns.DependencyCredentialsRejectedPattern;
 import com.relayaegis.diagnostics.patterns.DependencyNetworkDetachedPattern;
 import com.relayaegis.diagnostics.patterns.DependencyRecoveredPattern;
+import com.relayaegis.diagnostics.patterns.KubernetesWorkloadPattern;
 import com.relayaegis.diagnostics.patterns.DependencyUnavailablePattern;
 import com.relayaegis.diagnostics.patterns.Http5xxPattern;
 import com.relayaegis.diagnostics.patterns.NetworkFailurePatterns;
@@ -60,6 +61,7 @@ public class FailurePatternRegistry {
                 new DependencyRecoveredPattern(),
                 new DependencyNetworkDetachedPattern(),
                 new DependencyCredentialsRejectedPattern(),
+                new KubernetesWorkloadPattern(),
                 new NetworkFailurePatterns.DnsFailurePattern(),
                 new NetworkFailurePatterns.TcpConnectTimeoutPattern(),
                 new NetworkFailurePatterns.TlsFailurePattern(),

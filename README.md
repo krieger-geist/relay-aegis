@@ -31,7 +31,7 @@ Code and Live URL are separate pages on one assessment engine: Repositories neve
 
 | Area | What actually happens |
 |---|---|
-| **Runtime self-healing** | Monitors registered applications, opens incidents after consecutive failed health checks, inspects the allowlisted Docker container, and diagnoses with a deterministic pattern engine (container exited, crash loop, OOM, connection refused, timeout, HTTP 5xx, dependency down, …). Recovery actions are a closed set (`START_CONTAINER`, `RESTART_CONTAINER`, `RESTART_DEPENDENCY`, `RECONNECT_NETWORK` — reattach a healthy dependency to its own Compose network under its service alias); everything else is `INVESTIGATE` or `ESCALATE`. Every action passes the recovery policy, a guard (attempt limit, cooldown, circuit breaker) and post-action health verification. |
+| **Runtime self-healing** | Monitors registered applications, opens incidents after consecutive failed health checks, inspects the allowlisted Docker container, and diagnoses with a deterministic pattern engine (container exited, crash loop, OOM, connection refused, timeout, HTTP 5xx, dependency down, …). Recovery actions are a closed set (`START_CONTAINER`, `RESTART_CONTAINER`, `RESTART_DEPENDENCY`, `RECONNECT_NETWORK` — reattach a healthy dependency to its own Compose network under its service alias, and on Kubernetes `ROLLOUT_UNDO`, `SCALE_WORKLOAD`, `DELETE_POD`); everything else is `INVESTIGATE` or `ESCALATE`. Every action passes the recovery policy, a guard (attempt limit, cooldown, circuit breaker) and post-action health verification. |
 | **Runbooks as code** | New failure types are YAML files in [`runbooks/`](runbooks/README.md): what must match (container state, log patterns, failed checks, an unhealthy dependency), the cause, and one action from the closed set. They are validated on load, re-read every minute, and each incident records the runbook file and its SHA-256. A runbook only proposes; policy, guard and verification still decide. |
 | **Alerts from other tools** | Prometheus Alertmanager, Sentry and any tool that can POST JSON can open incidents (`/api/signals/*`, token- or signature-verified). A firing alert keeps its incident open even while RELAY's own checks pass; see [Integrations](docs/INTEGRATIONS.md). |
 | **Slack and webhooks** | Incident, approval and recovery messages go to Slack and to a signed outbound webhook. Approvers can **Approve** or **Reject** a recovery from Slack; clicks are signature-checked, limited to listed Slack users, recorded on the incident, and never offered for Production. |
@@ -122,6 +122,27 @@ Key settings in `.env` (see `.env.example` for all of them):
 | `RELAY_NOTIFY_WEBHOOK_URL`, `RELAY_NOTIFY_WEBHOOK_SECRET` | Every notification as JSON, HMAC-signed when a secret is set |
 | `RELAY_PUBLIC_URL` | Where people open RELAY; used for incident links in messages |
 | `GRAFANA_ADMIN_PASSWORD` | Grafana admin password for the monitoring profile |
+
+### Run it on Kubernetes
+
+A Helm chart installs RELAY in a cluster with permissions only in the namespaces you list. It can roll back a bad
+rollout, restart, scale up from zero and replace a bad pod, each behind a policy. On a kind test cluster, five real
+failures healed and verified in under 47 s each, with fast test timings. See the
+[Kubernetes guide](docs/KUBERNETES.md) for setup, permissions, measured results and limits.
+
+### Share a live demo from your PC
+
+[`scripts/live-demo.ps1`](scripts/live-demo.ps1) gives the RELAY running on your machine a temporary public HTTPS
+link through a Cloudflare quick tunnel (no account, nothing opened on your router), and lets the backend accept
+sign-ins from it. The link lives only while your PC, Docker and the tunnel run, and changes each time.
+
+```powershell
+winget install --id Cloudflare.cloudflared   # once
+.\scripts\live-demo.ps1                      # prints and copies the link
+.\scripts\live-demo.ps1 stop                 # after the call
+```
+
+Anyone with the link can register an account, so share it only for the call and stop it afterwards.
 
 ### Observe RELAY itself
 
@@ -214,7 +235,7 @@ images to GitHub Container Registry. Live-run results are recorded in [PROJECT_S
 - Local, single-host deployment, not hardened for exposure to untrusted networks. The socket proxies hold the Docker socket; the sandbox proxy can create containers and does not inspect the creation request beyond bind mounts (a `--privileged` request would pass), so keep `RELAY_SANDBOX_ENABLED=false` unless you need sandbox validation.
 - Repository analysis is heuristic static scanning of public repositories; findings are candidates until validated.
 - Two deterministic code-repair strategies exist; other findings receive recommendations, not patches.
-- Docker is the only executor so far; Kubernetes is next on the [roadmap](docs/ROADMAP.md). Notifications are not retried when a receiver is down.
+- Executors are Docker and Kubernetes Deployments ([guide and limits](docs/KUBERNETES.md)); no cloud APIs yet. Notifications are not retried when a receiver is down.
 - Removing a hard-coded credential does not revoke it — rotate it with its issuer.
 
 ---

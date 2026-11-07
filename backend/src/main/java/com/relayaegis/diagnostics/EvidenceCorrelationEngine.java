@@ -18,7 +18,7 @@ import com.relayaegis.repository.HealthCheckRepository;
 import com.relayaegis.repository.IncidentRepository;
 import com.relayaegis.runtime.ContainerSnapshot;
 import com.relayaegis.runtime.DependencyGraphService;
-import com.relayaegis.runtime.DockerRuntimeInspector;
+import com.relayaegis.runtime.RuntimeInspector;
 import com.relayaegis.runtime.LogExcerpt;
 import com.relayaegis.service.IncidentService;
 import com.relayaegis.util.TargetUrlPolicy;
@@ -54,7 +54,7 @@ public class EvidenceCorrelationEngine {
     private final HealthCheckRepository healthChecks;
     private final IncidentRepository incidentRepository;
     private final IncidentService incidents;
-    private final DockerRuntimeInspector inspector;
+    private final RuntimeInspector inspector;
     private final DependencyGraphService dependencyGraph;
     private final UrlNetworkProbe networkProbe;
     private final TargetUrlPolicy targetUrlPolicy;
@@ -62,7 +62,7 @@ public class EvidenceCorrelationEngine {
     private final ObjectMapper mapper;
 
     public EvidenceCorrelationEngine(ApplicationRepository applications, HealthCheckRepository healthChecks,
-            IncidentRepository incidentRepository, IncidentService incidents, DockerRuntimeInspector inspector,
+            IncidentRepository incidentRepository, IncidentService incidents, RuntimeInspector inspector,
             DependencyGraphService dependencyGraph, UrlNetworkProbe networkProbe, TargetUrlPolicy targetUrlPolicy,
             AssessmentRepository assessments, ObjectMapper mapper) {
         this.applications = applications;
