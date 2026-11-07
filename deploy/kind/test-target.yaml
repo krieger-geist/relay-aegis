@@ -1,0 +1,41 @@
+# The workload the end-to-end test breaks. Its image is built from ./test-target and loaded into kind.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-target
+  namespace: demo
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels: { app: test-target }
+  template:
+    metadata:
+      labels: { app: test-target }
+    spec:
+      terminationGracePeriodSeconds: 5
+      containers:
+        - name: app
+          image: relay-aegis-test-target:local
+          imagePullPolicy: IfNotPresent
+          ports: [{ containerPort: 3000 }]
+          readinessProbe:
+            httpGet: { path: /health, port: 3000 }
+            periodSeconds: 2
+            failureThreshold: 2
+          resources:
+            limits: { memory: 64Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-target
+  namespace: demo
+spec:
+  selector: { app: test-target }
+  ports: [{ port: 3000, targetPort: 3000 }]

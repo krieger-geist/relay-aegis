@@ -1,5 +1,6 @@
 package com.relayaegis.diagnostics.patterns;
 
+import com.relayaegis.runtime.kubernetes.KubernetesTarget;
 import com.relayaegis.diagnostics.DiagnosticContext;
 import com.relayaegis.diagnostics.DiagnosticFinding;
 import com.relayaegis.diagnostics.FailurePattern;
@@ -13,6 +14,8 @@ public class ApplicationHealthyPattern implements FailurePattern {
 
     public Optional<DiagnosticFinding> evaluate(DiagnosticContext context) {
         if (!context.currentlyHealthy()) return Optional.empty();
+        // Old pods can keep a Service answering while the new revision fails, so a passing check does not clear the workload.
+        if (context.runtime() != null && KubernetesTarget.is(context.runtime().name()) && !context.runtime().healthy()) return Optional.empty();
         int healthy = 0;
         for (HealthCheckEntity check : context.recentChecks()) { if (!check.healthy) break; healthy++; }
         DiagnosticFinding.Builder finding = DiagnosticFinding.builder(id(), "Application is responding normally", "observed_recovery")

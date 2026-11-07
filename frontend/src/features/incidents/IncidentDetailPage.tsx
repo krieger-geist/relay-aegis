@@ -34,12 +34,12 @@ export function IncidentDetailPage() {
   const verified = item.verification.status === 'passed';
   const resolvedByObservation = item.state === 'recovered' && !verified;
   const running = ['action_taken', 'verifying'].includes(item.state);
-  const hasDockerRunbook = item.component.startsWith('docker:');
+  const hasRunbook = item.component.startsWith('docker:') || item.component.startsWith('k8s:');
   const recommendation = recommendedNextStep(item);
   const recoveryLog = recoveryRecords(item.evidence);
   const observed = item.evidence.filter((evidence) => evidence.type !== 'recovery' && evidence.type !== 'verification');
   return <>
-    <PageHeader title={item.title} description={`${item.id} · ${item.applicationName} · ${item.component}`} actions={<><Link className="btn" to="/incidents"><ArrowLeft size={13} /> All incidents</Link>{hasDockerRunbook ? <button className="btn btn-primary" onClick={() => recover.mutate()} disabled={running || verified || resolvedByObservation || recover.isPending}><Play size={13} /> {running || recover.isPending ? 'Recovery in progress…' : verified ? 'Recovery verified' : resolvedByObservation ? 'Resolved' : 'Run recovery'}</button> : null}</>} />
+    <PageHeader title={item.title} description={`${item.id} · ${item.applicationName} · ${item.component}`} actions={<><Link className="btn" to="/incidents"><ArrowLeft size={13} /> All incidents</Link>{hasRunbook ? <button className="btn btn-primary" onClick={() => recover.mutate()} disabled={running || verified || resolvedByObservation || recover.isPending}><Play size={13} /> {running || recover.isPending ? 'Recovery in progress…' : verified ? 'Recovery verified' : resolvedByObservation ? 'Resolved' : 'Run recovery'}</button> : null}</>} />
     <div className="incident-detail-meta"><StatusBadge status={item.status} size="md" /><span className={`severity-pill ${item.severity.toLowerCase()}`}>{item.severity}</span><span className="meta-inline"><Clock3 size={13} /> Detected {item.detectedLabel}</span><span className="meta-inline"><FileText size={13} /> {observed.length} observed evidence items</span></div>
     {recover.data ? <div className="info-box" style={{ marginBottom: 14 }}><Clock3 size={14} /> Recovery action accepted. Follow the timeline and wait for a passing post-action verification before treating the incident as resolved.</div> : null}
     {recover.isError ? <div className="inline-error" role="alert">{recover.error.message}</div> : null}
@@ -68,8 +68,8 @@ export function IncidentDetailPage() {
         <CodeRootCause incident={item} />
         <Panel title="Recommended action" subtitle="The policy engine must approve every action" provenance={item.provenance}>
           <div className="recommended-action"><div className="recommended-icon"><Search size={16} /></div><div><div className="recommended-title">{recommendation.title}</div><div className="recommended-detail">{recommendation.detail}</div></div></div>
-          {hasDockerRunbook ? <div className="policy-indicator"><LockKeyhole size={13} /><span>Backend policy and the configured container allowlist are checked before execution.</span></div> : <div className="warning-box"><LockKeyhole size={13} /> No approved automatic recovery runbook is configured for this component.</div>}
-          {hasDockerRunbook && !resolvedByObservation ? <button className="btn btn-primary full-width" onClick={() => recover.mutate()} disabled={running || verified || recover.isPending}><Play size={13} /> Run recovery</button> : null}
+          {hasRunbook ? <div className="policy-indicator"><LockKeyhole size={13} /><span>Backend policy and the configured container allowlist are checked before execution.</span></div> : <div className="warning-box"><LockKeyhole size={13} /> No approved automatic recovery runbook is configured for this component.</div>}
+          {hasRunbook && !resolvedByObservation ? <button className="btn btn-primary full-width" onClick={() => recover.mutate()} disabled={running || verified || recover.isPending}><Play size={13} /> Run recovery</button> : null}
         </Panel>
         <Panel title="Application context" subtitle="Registered target metadata" provenance={item.provenance}><div className="context-kv"><div><span>Application</span><strong>{item.applicationName}</strong></div><div><span>Component</span><strong className="mono">{item.component}</strong></div><div><span>Detected</span><strong>{new Date(item.detectedAt).toLocaleString()}</strong></div><div><span>Recovery time</span><strong>{item.recoveryDurationMs === null ? 'Not measured' : `${item.recoveryDurationMs} ms`}</strong></div></div></Panel>
       </aside>

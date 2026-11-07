@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: RELAY AEGIS API
-  version: 1.2.0
+  version: 1.3.0
   description: >-
     Evidence-driven self-healing API: monitoring, deterministic diagnosis, policy-gated runtime recovery,
     live URL and GitHub assessment, sandbox-validated Auto-Repair and approval-gated pull requests.

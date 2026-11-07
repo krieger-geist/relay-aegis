@@ -1,0 +1,117 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Release.Name }}-secrets
+  labels: {{- include "relay.labels" . | nindent 4 }}
+type: Opaque
+data:
+  jwt-secret: {{ include "relay.secretValue" (dict "root" . "key" "jwt-secret" "value" .Values.auth.jwtSecret) }}
+  {{- if .Values.postgres.enabled }}
+  password: {{ include "relay.secretValue" (dict "root" . "key" "password" "value" .Values.postgres.password) }}
+  {{- end }}
+{{- if .Values.runbooks }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-runbooks
+  labels: {{- include "relay.labels" . | nindent 4 }}
+data:
+  {{- range $file, $content := .Values.runbooks }}
+  {{ $file }}: {{ $content | quote }}
+  {{- end }}
+{{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-backend
+  labels: {{- include "relay.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels: { app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: backend }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: backend }
+    spec:
+      serviceAccountName: {{ .Release.Name }}
+      securityContext: { runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, seccompProfile: { type: RuntimeDefault } }
+      {{- if .Values.postgres.enabled }}
+      # On a fresh install the database starts at the same time; without this the backend crashes and backs off until it is up.
+      initContainers:
+        - name: wait-for-database
+          image: {{ .Values.postgres.image }}
+          command: [sh, -c, "until pg_isready -h {{ .Release.Name }}-postgres -U relay -d relay_aegis; do sleep 2; done"]
+          securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
+      {{- end }}
+      containers:
+        - name: backend
+          image: {{ .Values.image.backend }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
+          ports: [{ containerPort: 8080, name: http }]
+          env:
+            - { name: POD_IP, valueFrom: { fieldRef: { fieldPath: status.podIP } } }
+            - { name: SPRING_PROFILES_ACTIVE, value: postgres }
+            - { name: SERVER_ADDRESS, value: 0.0.0.0 }
+            - { name: JPA_DDL_AUTO, value: validate }
+            - { name: FLYWAY_ENABLED, value: "true" }
+            {{- if .Values.postgres.enabled }}
+            - { name: DATABASE_URL, value: "jdbc:postgresql://{{ .Release.Name }}-postgres:5432/relay_aegis" }
+            - { name: DATABASE_USERNAME, value: relay }
+            - { name: DATABASE_PASSWORD, valueFrom: { secretKeyRef: { name: {{ .Release.Name }}-secrets, key: password } } }
+            {{- else }}
+            - { name: DATABASE_URL, value: {{ .Values.externalDatabase.url | quote }} }
+            - { name: DATABASE_USERNAME, value: {{ .Values.externalDatabase.username | quote }} }
+            - { name: DATABASE_PASSWORD, valueFrom: { secretKeyRef: { name: {{ .Values.externalDatabase.passwordSecret }}, key: password } } }
+            {{- end }}
+            - { name: RELAY_AUTH_JWT_SECRET, valueFrom: { secretKeyRef: { name: {{ .Release.Name }}-secrets, key: jwt-secret } } }
+            - { name: RELAY_AUTH_ADMIN_EMAILS, value: {{ .Values.auth.adminEmails | quote }} }
+            - { name: RELAY_AUTH_COOKIE_SECURE, value: {{ .Values.auth.cookieSecure | quote }} }
+            - { name: RELAY_CORS_ALLOWED_ORIGINS, value: {{ .Values.auth.corsAllowedOrigins | quote }} }
+            - { name: RELAY_LEADER_ADVERTISE_URL, value: "http://$(POD_IP):8080" }
+            - { name: RELAY_KUBERNETES_ENABLED, value: "true" }
+            - { name: RELAY_KUBERNETES_ALLOWED_WORKLOADS, value: {{ join "," .Values.kubernetes.allowedWorkloads | quote }} }
+            - { name: RELAY_KUBERNETES_INSPECT_WORKLOADS, value: {{ join "," .Values.kubernetes.inspectWorkloads | quote }} }
+            - { name: RELAY_KUBERNETES_DEPENDENCIES, value: {{ .Values.kubernetes.dependencies | quote }} }
+            - { name: RELAY_KUBERNETES_RESTORE_REPLICAS, value: {{ .Values.kubernetes.restoreReplicas | quote }} }
+            - { name: RELAY_KUBERNETES_SIGNAL_INTERVAL_MS, value: {{ .Values.kubernetes.signalIntervalMs | quote }} }
+            - { name: RELAY_MONITORING_ALLOWED_HOSTS, value: {{ join "," .Values.monitoring.allowedHosts | quote }} }
+            - { name: RELAY_MONITORING_INTERVAL_MS, value: {{ .Values.monitoring.intervalMs | quote }} }
+            - { name: RELAY_RECOVERY_COOLDOWN_SECONDS, value: {{ .Values.recovery.cooldownSeconds | quote }} }
+            {{- if .Values.runbooks }}
+            - { name: RELAY_RUNBOOKS_DIR, value: /app/runbooks }
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          startupProbe:
+            httpGet: { path: /api/health, port: http }
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet: { path: /api/health, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /api/health, port: http }
+            periodSeconds: 20
+            failureThreshold: 6
+          resources: {{- toYaml .Values.resources.backend | nindent 12 }}
+          {{- if .Values.runbooks }}
+          volumeMounts:
+            - { name: runbooks, mountPath: /app/runbooks, readOnly: true }
+          {{- end }}
+      {{- if .Values.runbooks }}
+      volumes:
+        - { name: runbooks, configMap: { name: {{ .Release.Name }}-runbooks } }
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-backend
+  labels: {{- include "relay.labels" . | nindent 4 }}
+spec:
+  selector: { app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: backend }
+  ports: [{ port: 8080, targetPort: http, name: http }]

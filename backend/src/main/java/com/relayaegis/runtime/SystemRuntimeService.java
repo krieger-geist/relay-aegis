@@ -22,10 +22,10 @@ import org.springframework.stereotype.Service;
 public class SystemRuntimeService {
     private final ApplicationService applications;
     private final DockerControlService docker;
-    private final DockerRuntimeInspector inspector;
+    private final RuntimeInspector inspector;
     private final DependencyGraphService dependencyGraph;
 
-    public SystemRuntimeService(ApplicationService applications, DockerControlService docker, DockerRuntimeInspector inspector,
+    public SystemRuntimeService(ApplicationService applications, DockerControlService docker, RuntimeInspector inspector,
                                 DependencyGraphService dependencyGraph) {
         this.applications = applications;
         this.docker = docker;

@@ -30,7 +30,7 @@ and policy-gated, and AI only proposes. That is exactly what stops companies tru
 | Engineering hygiene | Done in Phase 0 (v1.0.0): CI, licence, security policy, changelog, scanning, signed images | First thing an engineer checks in a repo |
 | RELAY's own reliability | Single instance; `@Scheduled` monitoring would double-act if two ran; Docker socket mounted directly | "Who heals the healer?" and the security review |
 | Observability of RELAY | Actuator only; no Prometheus metrics, traces or structured logs | Must fit into their existing monitoring |
-| Platforms | Docker on one host only | Most companies run Kubernetes or a cloud |
+| Platforms | Kubernetes done in Phase 3 (v1.3.0): Deployments, Helm chart, tested on kind. No cloud APIs yet | Most companies run Kubernetes or a cloud |
 | Signals | Health checks, container state and logs only; corrupt data with green health is missed | Real incidents show up first in error rates, latency and user flows |
 | Integrations | Done in Phase 2 (v1.2.0): Alertmanager, Sentry and webhook in; Slack (with approvals) and signed webhook out. PagerDuty and email still missing | It has to plug into the on-call workflow |
 | Runbooks | Done in Phase 2 (v1.2.0): YAML runbooks in Git, validated on load | Teams want reviewed, versioned runbooks as code |
@@ -75,14 +75,20 @@ PagerDuty to Phase 7.
 Turn the engine into three interfaces so new environments are adapters, not rewrites:
 - **Signal sources:** HTTP health, synthetic user journeys, Prometheus queries, log patterns, inbound webhooks
   (Alertmanager, Sentry, Grafana).
-- **Executors:** Docker today; Kubernetes next; cloud APIs later.
+- **Executors:** Docker and Kubernetes today; cloud APIs later.
 - **Notifiers / approvals:** Slack (approve / reject buttons), email, PagerDuty, generic webhook.
 - **Runbooks as code:** YAML runbooks (match → evidence required → allowed actions in order → verification),
   validated on load, versioned in Git, every action still passing policy and guard.
 
 **Done when:** a new failure type is handled by adding a runbook file, with no Java change.
 
-### Phase 3: Kubernetes (3–4 weeks)
+### Phase 3: Kubernetes (3–4 weeks) · done (v1.3.0)
+Done: delete pod, rollout restart, rollout undo and scale, each behind a policy with namespace-scoped RBAC; signals from
+pod and Deployment state; a Helm chart; and an end-to-end test on `kind`. Five real failures healed and verified on
+kind, each in under 47 s with fast test timings ([results](KUBERNETES.md#measured-results)).
+Cut: cordon, because it needs cluster-wide permissions. Not tested on a cluster: dependency failure, because the test
+application has no database (unit tests only).
+
 - Executor actions: delete pod, rollout restart, rollout undo, scale, cordon (policy-gated, namespace-scoped RBAC).
 - Signals from Kubernetes events and probes (`CrashLoopBackOff`, `OOMKilled`, `ImagePullBackOff`, readiness failures).
 - Helm chart; end-to-end test on `kind` in CI with the chaos scenarios ported to Kubernetes.

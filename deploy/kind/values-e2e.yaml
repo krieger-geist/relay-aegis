@@ -1,0 +1,15 @@
+# Fast timings so the end-to-end test does not wait minutes. Not for real use.
+kubernetes:
+  namespaces: [demo]
+  allowedWorkloads: ["k8s:demo/test-target"]
+  signalIntervalMs: 5000
+monitoring:
+  allowedHosts: [test-target.demo.svc.cluster.local]
+  intervalMs: 5000
+recovery:
+  cooldownSeconds: 5
+auth:
+  adminEmails: e2e@relay.test
+  corsAllowedOrigins: "http://localhost:18081,http://127.0.0.1:18081"
+extraEnv:
+  - { name: RELAY_MONITORING_INITIAL_DELAY_MS, value: "3000" }

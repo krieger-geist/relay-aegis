@@ -10,6 +10,9 @@ import com.relayaegis.service.DockerControlService;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import com.relayaegis.runtime.kubernetes.KubernetesControlService;
+import com.relayaegis.runtime.kubernetes.KubernetesTarget;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
@@ -23,15 +26,25 @@ public class RecoveryPolicyEngine {
     public static final String POLICY_RESTART = "policy-restart";
     public static final String POLICY_DEPENDENCY = "policy-dependency-restart";
     public static final String POLICY_NETWORK = "policy-network-reconnect";
+    public static final String POLICY_ROLLBACK = "policy-kubernetes-rollback";
+    public static final String POLICY_SCALE = "policy-kubernetes-scale";
+    public static final String POLICY_DELETE_POD = "policy-kubernetes-delete-pod";
 
     private final RecoveryPolicyRepository policies;
     private final DockerControlService docker;
     private final RecoveryGuard guard;
+    private final KubernetesControlService kubernetes;
 
     public RecoveryPolicyEngine(RecoveryPolicyRepository policies, DockerControlService docker, RecoveryGuard guard) {
+        this(policies, docker, guard, KubernetesControlService.disabled());
+    }
+
+    @Autowired
+    public RecoveryPolicyEngine(RecoveryPolicyRepository policies, DockerControlService docker, RecoveryGuard guard, KubernetesControlService kubernetes) {
         this.policies = policies;
         this.docker = docker;
         this.guard = guard;
+        this.kubernetes = kubernetes;
     }
 
     /**
@@ -64,15 +77,31 @@ public class RecoveryPolicyEngine {
         if (target == null || target.isBlank()) {
             return RecoveryDecision.blocked(action, null, null, null, pattern, confidence, reasons, "No container is linked to this recovery action.", false);
         }
-        if (!docker.isEnabled()) {
-            return RecoveryDecision.blocked(action, target, null, null, pattern, confidence, reasons, "Docker recovery is disabled by configuration.", false);
+        if (KubernetesTarget.is(target)) {
+            if (!kubernetes.isEnabled()) {
+                return RecoveryDecision.blocked(action, target, null, null, pattern, confidence, reasons, "Kubernetes recovery is disabled by configuration.", false);
+            }
+            if (!kubernetes.isAllowed(target)) {
+                return RecoveryDecision.blocked(action, target, null, null, pattern, confidence, reasons,
+                        "Workload " + target + " is not in the recovery allowlist (RELAY_KUBERNETES_ALLOWED_WORKLOADS).", false);
+            }
+        } else {
+            if (!docker.isEnabled()) {
+                return RecoveryDecision.blocked(action, target, null, null, pattern, confidence, reasons, "Docker recovery is disabled by configuration.", false);
+            }
+            if (!docker.isAllowed(target)) {
+                return RecoveryDecision.blocked(action, target, null, null, pattern, confidence, reasons,
+                        "Container " + target + " is not in the recovery allowlist (RELAY_DOCKER_ALLOWED_CONTAINERS).", false);
+            }
         }
-        if (!docker.isAllowed(target)) {
-            return RecoveryDecision.blocked(action, target, null, null, pattern, confidence, reasons,
-                    "Container " + target + " is not in the recovery allowlist (RELAY_DOCKER_ALLOWED_CONTAINERS).", false);
-        }
-        String policyId = action == RecoveryActionType.RESTART_DEPENDENCY ? POLICY_DEPENDENCY
-                : action == RecoveryActionType.RECONNECT_NETWORK ? POLICY_NETWORK : POLICY_RESTART;
+        String policyId = switch (action) {
+            case RESTART_DEPENDENCY -> POLICY_DEPENDENCY;
+            case RECONNECT_NETWORK -> POLICY_NETWORK;
+            case ROLLOUT_UNDO -> POLICY_ROLLBACK;
+            case SCALE_WORKLOAD -> POLICY_SCALE;
+            case DELETE_POD -> POLICY_DELETE_POD;
+            default -> POLICY_RESTART;
+        };
         RecoveryPolicyEntity policy = policies.findById(policyId).orElse(null);
         if (policy == null) {
             return RecoveryDecision.blocked(action, target, policyId, null, pattern, confidence, reasons, "Recovery policy " + policyId + " is not configured.", false);

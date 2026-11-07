@@ -1,0 +1,65 @@
+image:
+  backend: relay-aegis-backend:local
+  frontend: relay-aegis-frontend:local
+  pullPolicy: IfNotPresent
+
+# Two or more replicas elect a leader through the database; only the leader monitors and acts.
+replicas: 1
+
+kubernetes:
+  # Namespaces RELAY gets a Role in. It has no permissions anywhere else, and none at cluster level.
+  namespaces: []
+  # Deployments RELAY may change, written k8s:<namespace>/<deployment>. Each must be in one of the namespaces above.
+  allowedWorkloads: []
+  # Deployments RELAY may only read, such as a database it should diagnose but never touch.
+  inspectWorkloads: []
+  # k8s:ns/app=k8s:ns/db|k8s:ns/cache;k8s:ns/worker=k8s:ns/queue
+  dependencies: ""
+  restoreReplicas: 1
+  signalIntervalMs: 15000
+
+monitoring:
+  # Hosts RELAY may run health checks against, for example my-app.my-namespace.svc.cluster.local
+  allowedHosts: []
+  intervalMs: 60000
+
+recovery:
+  cooldownSeconds: 60
+
+auth:
+  # Comma-separated emails that receive the ADMIN role when they register.
+  adminEmails: ""
+  # Browser origins allowed to sign in, for example https://relay.example.com
+  corsAllowedOrigins: "http://localhost:5173"
+  # Blank: generated once and kept across upgrades.
+  jwtSecret: ""
+  # Set true behind HTTPS, false for plain HTTP; "auto" decides per request.
+  cookieSecure: auto
+
+# A small built-in database for trying RELAY out. For real use, set enabled to false and use an external one.
+postgres:
+  enabled: true
+  image: postgres:16-alpine
+  # Blank: generated once and kept across upgrades. Without persistence, a restart loses RELAY's data.
+  password: ""
+  persistence: false
+  size: 2Gi
+
+# Used when postgres.enabled is false. The named Secret must hold the key "password".
+externalDatabase:
+  url: ""
+  username: relay
+  passwordSecret: ""
+
+# YAML runbooks, as file name to file content.
+runbooks: {}
+
+extraEnv: []
+
+resources:
+  backend:
+    requests: { cpu: 200m, memory: 512Mi }
+    limits: { memory: 768Mi }
+  frontend:
+    requests: { cpu: 20m, memory: 32Mi }
+    limits: { memory: 64Mi }

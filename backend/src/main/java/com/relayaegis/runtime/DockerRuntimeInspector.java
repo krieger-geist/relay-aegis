@@ -21,7 +21,7 @@ import org.springframework.stereotype.Component;
  * CPU, memory, ports, networks and logs. Environment variables, mounts and command lines are never read.
  */
 @Component
-public class DockerRuntimeInspector {
+public class DockerRuntimeInspector implements RuntimeInspector {
     static final int LOG_TAIL = 200;
     static final int MAX_STORED_LINES = 60;
 
@@ -134,7 +134,7 @@ public class DockerRuntimeInspector {
         }
     }
 
-    static LogExcerpt parseLogs(String container, String raw) {
+    public static LogExcerpt parseLogs(String container, String raw) {
         List<String> all = new ArrayList<>();
         for (String line : raw.split("\\r?\\n")) {
             if (line.isBlank()) continue;
