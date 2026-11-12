@@ -11,6 +11,10 @@ RELAY AEGIS detects failures, explains them from evidence, repairs what it can r
 DETECT → COLLECT EVIDENCE → DIAGNOSE → RANK → CLASSIFY → REPAIR / RECOMMEND → VERIFY → RESULT
 ```
 
+**Live demo:** [13-204-75-201.sslip.io](https://13-204-75-201.sslip.io). Sign up and watch RELAY detect, diagnose and
+restart its demo application. The public demo watches only that application; to point RELAY at your own apps and
+logs, clone the repository and run it yourself.
+
 Nothing is marked *resolved* because an action ran. A runtime repair is resolved only after health verification passes; a code repair ends as a reviewed pull request that a human merges.
 
 ---
@@ -129,6 +133,12 @@ A Helm chart installs RELAY in a cluster with permissions only in the namespaces
 rollout, restart, scale up from zero and replace a bad pod, each behind a policy. On a kind test cluster, five real
 failures healed and verified in under 47 s each, with fast test timings. See the
 [Kubernetes guide](docs/KUBERNETES.md) for setup, permissions, measured results and limits.
+
+### Run it on one AWS server
+
+[`deploy/aws/setup.sh`](deploy/aws/setup.sh) installs the released images on a small Ubuntu EC2 server behind Caddy,
+which gets a free HTTPS certificate. About $22 a month on a `t3.small`. See the [AWS guide](docs/AWS.md) for console
+steps, cost and limits.
 
 ### Share a live demo from your PC
 
