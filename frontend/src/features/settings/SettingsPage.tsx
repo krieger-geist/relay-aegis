@@ -5,10 +5,13 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { Panel } from '@/components/common/Panel';
 import { ErrorState, LoadingState } from '@/components/feedback/States';
 import { apiGet, apiPut } from '@/lib/api/client';
+import { useAuth } from '@/features/auth/authContext';
 import type { RecoveryPolicy, RecoveryPolicyMode } from '@/types/domain';
 
 export function SettingsPage() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
   const [draftModes, setDraftModes] = useState<Record<string, RecoveryPolicyMode>>({});
   const [confirmPolicy, setConfirmPolicy] = useState<RecoveryPolicy | null>(null);
   const [typedConfirmation, setTypedConfirmation] = useState('');
@@ -29,10 +32,11 @@ export function SettingsPage() {
       <aside className="settings-nav panel"><div className="settings-nav-item active"><ShieldCheck size={15} /> Recovery policies</div><div className="settings-nav-item"><UserRoundCog size={15} /> Access and roles <span>Planned</span></div><div className="settings-nav-item"><KeyRound size={15} /> API keys <span>Planned</span></div><div className="settings-nav-item"><ClipboardCheck size={15} /> Audit history <span>Planned</span></div></aside>
       <div className="settings-main">
         <Panel title="Recovery policies" subtitle="Diagnosis does not grant permission to perform an action" provenance={policies.data.provenance}>
+          {isAdmin ? null : <div className="info-box" style={{ margin: 14 }} role="note"><ShieldCheck size={14} /> Only an admin can change recovery policies. They apply to every user of this RELAY.</div>}
           <div className="policy-header-row"><span>Action and scope</span><span>Policy mode</span><span>Risk</span></div>
           {policies.data.data.map((policy) => <div className="policy-row" key={policy.id}>
             <div><div className="policy-name">{policy.action}</div><div className="policy-desc">{policy.description}</div><div className="app-meta">Scope: {policy.scope}</div></div>
-            <div><select className="select policy-select" aria-label={`${policy.action} policy mode`} value={draftModes[policy.id] ?? policy.mode} onChange={(event) => { const mode = event.target.value as RecoveryPolicyMode; setDraftModes((old) => ({ ...old, [policy.id]: mode })); if (mode !== 'allow_automatically') applyMode(policy, mode); }}><option value="disabled">Disabled</option><option value="require_approval">Require approval</option><option value="allow_automatically">Allow automatically</option></select>{draftModes[policy.id] && draftModes[policy.id] === 'allow_automatically' && policy.mode !== 'allow_automatically' ? <button className="btn btn-sm btn-primary" style={{ marginTop: 7 }} onClick={() => applyMode(policy, 'allow_automatically')}>Review confirmation</button> : null}</div>
+            <div><select className="select policy-select" aria-label={`${policy.action} policy mode`} disabled={!isAdmin} value={draftModes[policy.id] ?? policy.mode} onChange={(event) => { const mode = event.target.value as RecoveryPolicyMode; setDraftModes((old) => ({ ...old, [policy.id]: mode })); if (mode !== 'allow_automatically') applyMode(policy, mode); }}><option value="disabled">Disabled</option><option value="require_approval">Require approval</option><option value="allow_automatically">Allow automatically</option></select>{draftModes[policy.id] && draftModes[policy.id] === 'allow_automatically' && policy.mode !== 'allow_automatically' ? <button className="btn btn-sm btn-primary" style={{ marginTop: 7 }} onClick={() => applyMode(policy, 'allow_automatically')}>Review confirmation</button> : null}</div>
             <div><span className={`risk-tag ${policy.risk}`}>{policy.risk} risk</span></div>
           </div>)}
           {notice ? <div className="info-box" role="status" style={{ margin: 14 }}>{notice}</div> : null}
@@ -47,7 +51,7 @@ export function SettingsPage() {
         </Panel>
         <Panel title="Operational safeguards" subtitle="Current controls and remaining deployment hardening">
           <div className="security-check"><CheckCircle2 size={15} /><span>AI diagnosis is advisory and does not independently authorize recovery actions.</span></div>
-          <div className="security-check"><CheckCircle2 size={15} /><span>Automatic recovery policy changes require typed confirmation.</span></div>
+          <div className="security-check"><CheckCircle2 size={15} /><span>Only admins can change recovery policies, and automatic recovery requires typed confirmation.</span></div>
           <div className="security-check"><CheckCircle2 size={15} /><span>Every API requires sign-in; pull requests can only be created by ADMIN or approver accounts for allowlisted repositories.</span></div>
           <div className="security-check"><CheckCircle2 size={15} /><span>Live URL checks are restricted to configured host allowlists and do not follow redirects.</span></div>
           <div className="security-check"><AlertTriangle size={15} /><span>This is a single-host deployment with Docker socket access; network isolation, tenant separation and a full actor audit trail for runtime actions are required before a shared production rollout.</span><span className="planned-label">Required before production</span></div>

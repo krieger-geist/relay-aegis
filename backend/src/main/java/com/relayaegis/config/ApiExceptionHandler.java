@@ -25,7 +25,7 @@ public class ApiExceptionHandler {
     public ResponseEntity<ErrorDto> handleStatus(ResponseStatusException exception) {
         HttpStatus status=HttpStatus.valueOf(exception.getStatusCode().value());
         String message=exception.getReason()==null?status.getReasonPhrase():exception.getReason();
-        return ResponseEntity.status(status).body(new ErrorDto(message,status.value(),Instant.now()));
+        return ResponseEntity.status(status).headers(exception.getHeaders()).body(new ErrorDto(message,status.value(),Instant.now()));
     }
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorDto> handleValidation(MethodArgumentNotValidException exception) {

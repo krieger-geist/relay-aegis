@@ -29,7 +29,9 @@ public class RecoveryController {
     }
     @GetMapping("/recovery-policies")
     public ApiEnvelope<List<RecoveryPolicyDto>> listPolicies() { return ApiEnvelope.of(policies.list(), "live"); }
+    /** Policies decide what RELAY may do without a human, for every user, so only an ADMIN may change them. */
     @PutMapping("/recovery-policies/{id}")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
     public ApiEnvelope<RecoveryPolicyDto> updatePolicy(@PathVariable String id, @Valid @RequestBody UpdatePolicyRequest request) {
         RecoveryPolicyDto dto=policies.update(id, request); return ApiEnvelope.of(dto, dto.provenance());
     }

@@ -26,7 +26,9 @@ public class ApplicationController {
     private final ApplicationService applications;
     private final MonitoringService monitoring;
     private final SystemRuntimeService runtime;
-    public ApplicationController(ApplicationService applications, MonitoringService monitoring, SystemRuntimeService runtime) { this.applications=applications; this.monitoring=monitoring; this.runtime=runtime; }
+    private final com.relayaegis.auth.ActionRateLimiter limiter;
+    public ApplicationController(ApplicationService applications, MonitoringService monitoring, SystemRuntimeService runtime,
+                                 com.relayaegis.auth.ActionRateLimiter limiter) { this.applications=applications; this.monitoring=monitoring; this.runtime=runtime; this.limiter=limiter; }
 
     @GetMapping
     public ApiEnvelope<List<ApplicationDto>> list() {
@@ -35,7 +37,9 @@ public class ApplicationController {
         return ApiEnvelope.of(data, provenance);
     }
     @PostMapping
-    public ApiEnvelope<ApplicationDto> register(@Valid @RequestBody RegisterApplicationRequest request) {
+    public ApiEnvelope<ApplicationDto> register(@Valid @RequestBody RegisterApplicationRequest request,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal com.relayaegis.auth.AuthenticatedUser user) {
+        limiter.acquire(user, com.relayaegis.auth.ActionRateLimiter.Action.APPLICATION);
         ApplicationDto app=applications.register(request);
         return ApiEnvelope.of(app, app.provenance());
     }

@@ -23,9 +23,12 @@ public class AssessmentController {
     private final com.relayaegis.repair.RepairOrchestrator repairs;
     private final com.relayaegis.assessment.AssessmentTargetPolicy targets;
     private final com.relayaegis.service.LiveInsightService liveInsight;
+    private final com.relayaegis.auth.ActionRateLimiter limiter;
     public record TargetPolicyDto(boolean allowPublicHosts, java.util.List<String> allowedHosts) {}
     public AssessmentController(AssessmentService assessments, com.relayaegis.repair.RepairOrchestrator repairs,
-                                com.relayaegis.assessment.AssessmentTargetPolicy targets, com.relayaegis.service.LiveInsightService liveInsight) {
+                                com.relayaegis.assessment.AssessmentTargetPolicy targets, com.relayaegis.service.LiveInsightService liveInsight,
+                                com.relayaegis.auth.ActionRateLimiter limiter) {
+        this.limiter = limiter;
         this.targets = targets;
         this.liveInsight = liveInsight;
         this.assessments = assessments; this.repairs = repairs;
@@ -61,7 +64,9 @@ public class AssessmentController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.ACCEPTED)
-    public ApiEnvelope<AssessmentDto> create(@Valid @RequestBody CreateAssessmentRequest request) {
+    public ApiEnvelope<AssessmentDto> create(@Valid @RequestBody CreateAssessmentRequest request,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal com.relayaegis.auth.AuthenticatedUser user) {
+        limiter.acquire(user, com.relayaegis.auth.ActionRateLimiter.Action.ASSESSMENT);
         AssessmentDto dto = assessments.create(request);
         return ApiEnvelope.of(dto, "live");
     }

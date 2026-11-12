@@ -5,6 +5,22 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-11-13
+
+Hardening for public instances, where anyone can sign up (such as the AWS demo).
+
+### Added
+- Run RELAY on one AWS server: `deploy/aws` (setup script, Compose override, Caddy with automatic HTTPS) and the
+  [AWS guide](docs/AWS.md).
+- Per-account hourly limits on starting assessments (default 30) and adding applications (default 20), answered with
+  HTTP 429 and `Retry-After`. ADMIN accounts are not limited. Set with `RELAY_LIMIT_ASSESSMENTS_PER_HOUR` and
+  `RELAY_LIMIT_APPLICATIONS_PER_HOUR`; the AWS deploy uses 10 and 3.
+
+### Changed
+- Only ADMIN accounts can change recovery policies and reload runbooks (HTTP 403 for others). Policies apply to every
+  user, so before this any signed-in account could switch healing off for everyone. Settings shows the policies
+  read-only to other accounts.
+
 ## [1.3.0] - 2026-11-07
 
 Kubernetes release (roadmap Phase 3). RELAY now runs in a cluster from a Helm chart and repairs Deployments with
@@ -149,7 +165,9 @@ First public release: the Sentry × Dezyne E'cole Hackathon 2026 system, with re
 ### Changed
 - Frontend image installs dependencies with `npm ci` from the lockfile for reproducible builds.
 
-[Unreleased]: https://github.com/krieger-geist/relay-aegis/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/krieger-geist/relay-aegis/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/krieger-geist/relay-aegis/compare/v1.3.0...v1.3.1
+[1.3.0]: https://github.com/krieger-geist/relay-aegis/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/krieger-geist/relay-aegis/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/krieger-geist/relay-aegis/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/krieger-geist/relay-aegis/releases/tag/v1.0.0

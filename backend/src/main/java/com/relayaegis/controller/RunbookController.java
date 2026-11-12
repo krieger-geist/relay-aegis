@@ -21,5 +21,6 @@ public class RunbookController {
 
     /** Re-reads the runbook files now instead of waiting for the next periodic reload. */
     @PostMapping("/reload")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
     public ApiEnvelope<List<RunbookCatalog.Status>> reload() { return ApiEnvelope.of(catalog.reload(), "live"); }
 }

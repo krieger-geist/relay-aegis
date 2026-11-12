@@ -170,6 +170,11 @@ relay:
     allowed-hosts: ${RELAY_ASSESSMENT_ALLOWED_HOSTS:localhost,127.0.0.1,test-target}
     # Opt-in: also accept any host that resolves only to public IPs (private/internal targets stay blocked).
     allow-public-hosts: ${RELAY_ASSESSMENT_ALLOW_PUBLIC_HOSTS:false}
+  # Per-account hourly limits, so on an instance where anyone can sign up one account cannot make the server scan a
+  # site or add checks without end. ADMIN accounts are not limited; 0 turns a limit off.
+  limits:
+    assessments-per-hour: ${RELAY_LIMIT_ASSESSMENTS_PER_HOUR:30}
+    applications-per-hour: ${RELAY_LIMIT_APPLICATIONS_PER_HOUR:20}
 logging:
   level:
     com.relayaegis: INFO
