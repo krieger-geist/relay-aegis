@@ -23,6 +23,10 @@ public class ApplicationEntity {
     @Column(length = 1000) public String description;
     @Column(length = 200) public String dockerContainer;
     @Column(length = 300) public String githubRepository;
+    /** Optional user journey (e.g. the Orders list) on the same host, checked after the health endpoint passes. */
+    @Column(length = 1000) public String journeyUrl;
+    /** Optional hook on the same host that moves one bad record aside (never deletes); used only with approval. */
+    @Column(length = 1000) public String quarantineUrl;
     @Column(nullable = false, length = 24) public String provenance;
     @Column(nullable = false) public Instant createdAt;
 

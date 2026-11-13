@@ -42,6 +42,8 @@ export interface Application {
   deploymentSha: string;
   githubRepository: string | null;
   dockerContainer: string | null;
+  journeyUrl?: string | null;
+  quarantineUrl?: string | null;
   integrations: { url: IntegrationState; docker: IntegrationState; github: IntegrationState };
   description: string;
   provenance: Provenance;
@@ -62,7 +64,7 @@ export interface HealthSample {
   errorMessage: string | null;
   provenance: Provenance;
   /** healthy | degraded (non-2xx response) | unreachable (no response); 'failed' for checks recorded before outcomes existed. */
-  outcome: 'healthy' | 'degraded' | 'unreachable' | 'failed';
+  outcome: 'healthy' | 'degraded' | 'unreachable' | 'journey_failed' | 'failed';
   statusCode: number | null;
 }
 
@@ -170,7 +172,7 @@ export interface ResolutionProgress {
   open: boolean;
   consecutiveHealthyChecks: number;
   requiredHealthyChecks: number;
-  latestOutcome: 'healthy' | 'degraded' | 'unreachable' | 'failed' | null;
+  latestOutcome: 'healthy' | 'degraded' | 'unreachable' | 'journey_failed' | 'failed' | null;
   latestCheckAt: string | null;
 }
 

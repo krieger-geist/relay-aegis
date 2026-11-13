@@ -14,6 +14,7 @@ import com.relayaegis.diagnostics.patterns.Http5xxPattern;
 import com.relayaegis.diagnostics.patterns.NetworkFailurePatterns;
 import com.relayaegis.diagnostics.patterns.OomPattern;
 import com.relayaegis.diagnostics.patterns.PortListenerPattern;
+import com.relayaegis.diagnostics.patterns.UserJourneyPattern;
 import com.relayaegis.diagnostics.runbook.RunbookCatalog;
 import java.util.ArrayList;
 import java.util.List;
@@ -57,6 +58,7 @@ public class FailurePatternRegistry {
                 new ApplicationTimeoutPattern(),
                 new ConnectionRefusedPattern(),
                 new Http5xxPattern(),
+                new UserJourneyPattern(),
                 new DependencyUnavailablePattern(),
                 new DependencyRecoveredPattern(),
                 new DependencyNetworkDetachedPattern(),

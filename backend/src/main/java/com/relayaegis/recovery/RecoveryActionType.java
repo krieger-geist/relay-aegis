@@ -23,6 +23,8 @@ public enum RecoveryActionType {
     SCALE_WORKLOAD,
     /** Kubernetes: delete one bad pod while its siblings stay ready, so the Deployment replaces it (separate policy). */
     DELETE_POD,
+    /** Move one bad data record aside through the application's own quarantine hook. Never a delete; never automatic. */
+    QUARANTINE_RECORD,
     /** No safe automatic action: collect more evidence (logs, configuration) before acting. */
     INVESTIGATE,
     /** A restart would not help or is unsafe (crash loop, configuration error, external failure): needs a human. */
@@ -30,6 +32,6 @@ public enum RecoveryActionType {
 
     public boolean mutates() {
         return this == START_CONTAINER || this == RESTART_CONTAINER || this == RESTART_DEPENDENCY || this == RECONNECT_NETWORK
-                || this == ROLLOUT_UNDO || this == SCALE_WORKLOAD || this == DELETE_POD;
+                || this == ROLLOUT_UNDO || this == SCALE_WORKLOAD || this == DELETE_POD || this == QUARANTINE_RECORD;
     }
 }

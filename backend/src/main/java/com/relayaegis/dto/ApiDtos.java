@@ -13,7 +13,7 @@ public final class ApiDtos {
     public record ApplicationDto(String id, String name, String url, String framework, String environment,
                                  String status, Long responseMs, Double errorRate, Instant lastChecked,
                                  String deploymentSha, String githubRepository, String dockerContainer, IntegrationConnections integrations,
-                                 String description, String provenance) {}
+                                 String description, String provenance, String journeyUrl, String quarantineUrl) {}
     public record RegisterApplicationRequest(
             @NotBlank @Size(max = 160) String name,
             @NotBlank @Size(max = 1000) String url,
@@ -21,7 +21,14 @@ public final class ApiDtos {
             String environment,
             @Size(max = 1000) String description,
             @Size(max = 300) String githubRepository,
-            @Size(max = 200) String dockerContainer) {}
+            @Size(max = 200) String dockerContainer,
+            @Size(max = 1000) String journeyUrl,
+            @Size(max = 1000) String quarantineUrl) {
+        public RegisterApplicationRequest(String name, String url, String framework, String environment, String description,
+                                          String githubRepository, String dockerContainer) {
+            this(name, url, framework, environment, description, githubRepository, dockerContainer, null, null);
+        }
+    }
     public record HealthCheckResult(ApplicationDto application, boolean healthy, Long responseMs,
                                     String message, String provenance, String outcome, Integer statusCode) {}
     public record HealthSampleDto(String id, String applicationId, Instant checkedAt, boolean healthy,

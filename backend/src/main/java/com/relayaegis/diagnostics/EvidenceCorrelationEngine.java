@@ -44,6 +44,10 @@ public class EvidenceCorrelationEngine {
     static final double CROSS_SOURCE_BOOST = 0.03;
     static final double HEALTHY_CONTRADICTION_PENALTY = 0.3;
     static final double STALE_EVIDENCE_PENALTY = 0.25;
+    /** A container start this long (or less) before the first failed check counts as "what changed". */
+    static final Duration CHANGE_WINDOW = Duration.ofMinutes(30);
+    static final double CHANGE_TARGET_BOOST = 0.03;
+    private static final Set<String> SLOWDOWN_PATTERNS = Set.of("application-timeout", "http-5xx", "dependency-unavailable", "tcp-connect-timeout");
     /** Patterns whose evidence stays valid across a restart (restart history, OOM flag, dependency state). */
     private static final Set<String> PROCESS_INDEPENDENT = Set.of("crash-loop", "oom-killed", "dependency-unavailable", "dependency-recovered");
     private static final Set<String> CODE_CATEGORIES = Set.of("reliability", "security", "error-handling", "database-safety",
@@ -107,10 +111,12 @@ public class EvidenceCorrelationEngine {
         NetworkObservation network = failing && app != null ? probe(app.url, unavailable) : null;
         List<CodeSignal> code = codeSignals(app, unavailable);
         History history = history(incident);
+        LatencyBaseline latency = LatencyBaseline.from(healthChecks.findTop100ByApplicationIdOrderByCheckedAtDesc(incident.applicationId));
+        if (latency == null) unavailable.add("Latency baseline: fewer than " + LatencyBaseline.MIN_SAMPLES + " healthy checks recorded for this application");
 
         return new DiagnosticContext(incident.id, incident.component, incident.detectedAt, incident.applicationId,
                 app == null ? null : app.url, app == null ? null : app.environment, container, List.copyOf(checks),
-                List.copyOf(evidence), runtime, logs, List.copyOf(dependencies), network, code, history, List.copyOf(unavailable));
+                List.copyOf(evidence), runtime, logs, List.copyOf(dependencies), network, code, history, List.copyOf(unavailable), latency);
     }
 
     /**
@@ -120,6 +126,7 @@ public class EvidenceCorrelationEngine {
      */
     public List<DiagnosticFinding> correlate(List<DiagnosticFinding> findings, DiagnosticContext context) {
         List<DiagnosticFinding> out = new ArrayList<>();
+        List<Change> changes = recentChanges(context);
         for (DiagnosticFinding finding : findings) {
             DiagnosticFinding next = finding;
             long independent = next.sources().stream().filter(s -> !s.equals("code") && !s.equals("history")).count();
@@ -138,6 +145,15 @@ public class EvidenceCorrelationEngine {
                     if (attached >= 2) break;
                     if (relatedCode(next, signal)) { next = next.plusSupport(DiagnosticContext.codeRef(signal), 0.02); attached++; }
                 }
+                for (Change change : changes) {
+                    // Context for every failure; a little extra weight when the finding acts on the container that changed.
+                    next = next.plusSupport(change.ref(), change.container().equals(next.actionTarget()) ? CHANGE_TARGET_BOOST : 0);
+                }
+                if (context.latency() != null) {
+                    // Slowing down before failing points at saturation (pool, threads, a slow dependency), not a sudden crash.
+                    boolean slowdownMatters = context.latency().slowBeforeFailure() && SLOWDOWN_PATTERNS.contains(next.patternId());
+                    next = next.plusSupport(context.latencyRef(), slowdownMatters ? CHANGE_TARGET_BOOST : 0);
+                }
                 if (context.history().incidentsLast24h() >= 2 && Set.of("runtime", "availability", "application").contains(next.category())) {
                     next = next.plusSupport(context.historyRef(), 0.02);
                 }
@@ -145,6 +161,36 @@ public class EvidenceCorrelationEngine {
             out.add(next);
         }
         return out;
+    }
+
+    /** One container that (re)started shortly before the failure began, cited as "what changed". */
+    record Change(String container, EvidenceRef ref) {}
+
+    /**
+     * Containers (the application and its observed dependencies) whose current process started within
+     * {@link #CHANGE_WINDOW} before the first failed check of the current streak: a restart or a new deployment right
+     * before a failure is the first thing an engineer asks about. Starts after the first failure are not changes that
+     * could explain it, so they are left out. Only recorded observations are used; nothing is guessed.
+     */
+    static List<Change> recentChanges(DiagnosticContext context) {
+        List<HealthCheckEntity> streak = context.failureStreak();
+        if (streak.isEmpty()) return List.of();
+        Instant firstFailure = streak.get(streak.size() - 1).checkedAt;
+        if (firstFailure == null) return List.of();
+        List<ContainerSnapshot> observed = new ArrayList<>();
+        if (context.runtime() != null) observed.add(context.runtime());
+        context.dependencies().stream().map(DependencyState::snapshot).filter(java.util.Objects::nonNull).forEach(observed::add);
+        List<Change> changes = new ArrayList<>();
+        for (ContainerSnapshot snapshot : observed) {
+            Instant started = snapshot.startedAt();
+            if (!snapshot.exists() || started == null || started.isAfter(firstFailure) || started.isBefore(firstFailure.minus(CHANGE_WINDOW))) continue;
+            long minutes = Duration.between(started, firstFailure).toMinutes();
+            String before = minutes < 1 ? "less than a minute" : minutes + " min";
+            changes.add(new Change(snapshot.name(), new EvidenceRef("CHG-" + snapshot.name(), "change",
+                    "What changed: container " + snapshot.name() + (snapshot.image() == null ? "" : " (image " + snapshot.image() + ")")
+                            + " started at " + started + ", " + before + " before the first failed check. A restart or new deployment right before a failure often explains it.")));
+        }
+        return List.copyOf(changes);
     }
 
     /** The running container started after the newest (failed) check: no check has observed the current process yet. */

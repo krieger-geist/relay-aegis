@@ -150,8 +150,11 @@ paths:
                 description: {type: string}
                 githubRepository: {type: string}
                 dockerContainer: {type: string}
+                journeyUrl: {type: string, format: uri, description: 'Optional user page checked after the health URL passes; same scheme, host and port'}
+                quarantineUrl: {type: string, format: uri, description: 'Optional hook that moves one bad record aside (POST {recordId, incidentId}); needs journeyUrl'}
       responses:
         '200': {description: OK}
+        '400': {description: 'Invalid URL, a journey or hook URL on another host, or a hook without a journey URL'}
         '401': {description: Missing or invalid access token}
         '429': {description: 'Hourly per-account limit reached (ADMIN accounts are not limited); see the Retry-After header'}
   /api/applications/{id}:

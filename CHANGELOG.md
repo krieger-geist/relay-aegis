@@ -5,6 +5,26 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+Phase 4: deeper detection.
+
+### Added
+- User journey checks: an optional journey URL per application (for example `/orders`), called after the health URL
+  passes. A failing journey records the new outcome `journey_failed` and opens an incident while health stays green.
+- Bad-record diagnosis (`user-journey-failure`): when the failing page reports `{"recordId": "..."}`, RELAY names the
+  record and recommends `QUARANTINE_RECORD`; without a record id it asks for investigation.
+- Data quarantine: `QUARANTINE_RECORD` calls the application's own quarantine hook (same host as the application,
+  allowlisted, no redirects, optional `X-Relay-Token` from `RELAY_QUARANTINE_TOKEN`). RELAY never deletes data. The new
+  policy `policy-data-quarantine` starts at *require approval* and cannot be set to automatic.
+- "What changed" evidence: a container (the application or a dependency) that started up to 30 minutes before the
+  first failed check is cited on every failure finding, with its image.
+- Latency baseline evidence: median and p95 response time from the application's own recent healthy checks. A last
+  healthy check at 3x the median or more is reported as a slowdown before the failure and strengthens timeout and
+  5xx findings.
+- Test target: in-memory orders, `GET /orders`, `POST /chaos/corrupt-record` and a `/relay/quarantine` hook.
+
+### Changed
+- Database migration V14 adds `journey_url` and `quarantine_url` to applications and `record_ref` to health checks.
+
 ## [1.3.1] - 2026-11-13
 
 Hardening for public instances, where anyone can sign up (such as the AWS demo).

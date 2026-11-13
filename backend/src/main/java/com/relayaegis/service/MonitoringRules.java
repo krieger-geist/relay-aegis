@@ -9,6 +9,8 @@ public final class MonitoringRules {
     public static final String HEALTHY = "healthy";
     public static final String DEGRADED = "degraded";
     public static final String UNREACHABLE = "unreachable";
+    /** The health endpoint passed but the application's user journey (e.g. the Orders list) failed. */
+    public static final String JOURNEY_FAILED = "journey_failed";
 
     private MonitoringRules() {}
 

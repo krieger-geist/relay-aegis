@@ -20,6 +20,10 @@ public class RecoveryExecutor {
     private final DockerControlService docker;
     private final RuntimeInspector inspector;
     private final KubernetesControlService kubernetes;
+    private DataQuarantineClient quarantine;
+
+    @Autowired(required = false)
+    void setQuarantineClient(DataQuarantineClient quarantine) { this.quarantine = quarantine; }
 
     public RecoveryExecutor(DockerControlService docker, RuntimeInspector inspector) {
         this(docker, inspector, KubernetesControlService.disabled());
@@ -34,7 +38,16 @@ public class RecoveryExecutor {
 
     public record ExecutionResult(boolean commandSucceeded, boolean noOp, String detail) {}
 
-    public ExecutionResult execute(RecoveryDecision decision) { return execute(decision, null); }
+    public ExecutionResult execute(RecoveryDecision decision) { return execute(decision, (String) null); }
+
+    /** Runs the decision for this application: data actions go to its quarantine hook, the rest to its runtime. */
+    public ExecutionResult execute(RecoveryDecision decision, com.relayaegis.entity.ApplicationEntity app, String incidentId) {
+        if (decision.authorized() && decision.action() == RecoveryActionType.QUARANTINE_RECORD) {
+            if (quarantine == null) return new ExecutionResult(false, false, "Data quarantine is not available in this build.");
+            return quarantine.quarantine(app.quarantineUrl, decision.target(), incidentId);
+        }
+        return execute(decision, app.dockerContainer);
+    }
 
     /** {@code appContainer} is the application's container; RECONNECT_NETWORK re-derives the network from it. */
     public ExecutionResult execute(RecoveryDecision decision, String appContainer) {
@@ -42,6 +55,9 @@ public class RecoveryExecutor {
             return new ExecutionResult(false, true, "Not executed: " + (decision.blockedReason() == null ? "action is not authorized." : decision.blockedReason()));
         }
         String target = decision.target();
+        if (decision.action() == RecoveryActionType.QUARANTINE_RECORD) {
+            return new ExecutionResult(false, false, "QUARANTINE_RECORD needs the application's quarantine hook; nothing was run.");
+        }
         if (KubernetesTarget.is(target)) return executeOnKubernetes(decision.action(), target);
         if (decision.action() == RecoveryActionType.ROLLOUT_UNDO || decision.action() == RecoveryActionType.SCALE_WORKLOAD || decision.action() == RecoveryActionType.DELETE_POD) {
             return new ExecutionResult(false, false, decision.action() + " exists only on Kubernetes; " + target + " is not a Kubernetes target.");

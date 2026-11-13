@@ -56,6 +56,11 @@ public class ApplicationService {
         entity.monitoringEnabled = true;
         entity.description = blankOr(request.description(), "Registered through RELAY AEGIS.");
         entity.githubRepository = normalizeGithubRepository(request.githubRepository());
+        entity.journeyUrl = sameHostUrl(request.journeyUrl(), entity.url, "User journey URL");
+        entity.quarantineUrl = sameHostUrl(request.quarantineUrl(), entity.url, "Quarantine hook URL");
+        if (entity.quarantineUrl != null && entity.journeyUrl == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A quarantine hook needs a user journey URL: the journey is what finds the bad record and proves the fix.");
+        }
         String requestedContainer = request.dockerContainer();
         if (requestedContainer != null && !requestedContainer.isBlank()) {
             String container = requestedContainer.trim();
@@ -115,7 +120,22 @@ public class ApplicationService {
                 ? "not_configured" : "needs_configuration";
         return new ApplicationDto(app.id, app.name, app.url, app.framework, app.environment, app.status,
                 app.responseMs, app.errorRate, app.lastChecked, app.deploymentSha, app.githubRepository, app.dockerContainer,
-                new IntegrationConnections(urlState, dockerState, githubState), app.description, app.provenance);
+                new IntegrationConnections(urlState, dockerState, githubState), app.description, app.provenance, app.journeyUrl, app.quarantineUrl);
+    }
+
+    /** Optional URL that must pass the monitoring allowlist and point at the same host and port as the health URL. */
+    private String sameHostUrl(String value, String healthUrl, String label) {
+        if (value == null || value.isBlank()) return null;
+        java.net.URI uri = targetUrlPolicy.validate(value.trim());
+        java.net.URI health = java.net.URI.create(healthUrl);
+        if (!uri.getHost().equalsIgnoreCase(health.getHost()) || uri.getPort() != health.getPort()
+                || !uri.getScheme().equalsIgnoreCase(health.getScheme())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, label + " must use the same scheme, host and port as the health URL.");
+        }
+        if (uri.getRawQuery() != null || uri.getRawFragment() != null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, label + " must not contain a query string or fragment.");
+        }
+        return uri.toString();
     }
 
     private static String validEnvironment(String environment) {
