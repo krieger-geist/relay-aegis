@@ -96,7 +96,7 @@ application has no database (unit tests only).
 **Done when:** the demo's failures heal on Kubernetes in CI, with measured times.
 
 ### Phase 4: Deeper detection (2–3 weeks)
-**Status: done (unreleased).** Synthetic user journey checks; approved data quarantine through the application's own
+**Status: done, released in v1.4.0.** Synthetic user journey checks; approved data quarantine through the application's own
 hook; "what changed" evidence; latency baseline; error-budget (SLO) burn-rate alerts; log anomaly rates; memory and
 CPU trends; and bad-deploy rollback to the last good image, pinned so Docker keeps it. Both "done when" cases were
 run live in Docker: `corrupt-record` was quarantined after approval, and a broken release was rolled back and verified

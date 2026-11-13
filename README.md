@@ -213,7 +213,7 @@ cd chaos
 | `flood` | 20 000 API requests, 300 at a time |
 | `rotate-password` | Rotates the orders-service database password while the service keeps a hard-coded one |
 
-### User journeys and bad records (Phase 4, unreleased)
+### User journeys and bad records (v1.4.0)
 
 A healthy `/health` does not mean users can work. Give an application a **user journey URL** (a real page, such as
 `/orders`) and RELAY calls it after the health check passes. If that page fails, RELAY opens an incident even though
@@ -227,7 +227,7 @@ and nothing is deleted. Try it with the bundled test target:
 3. Within two checks an incident opens: *Bad record order-1003 breaks the user journey*. Click **Run recovery** to
    approve; RELAY verifies the Orders page works again.
 
-### Bad deploys (Phase 4, unreleased)
+### Bad deploys (v1.4.0)
 
 RELAY remembers the last image that passed 3 health checks in a row and tags it so Docker keeps it. If an
 application starts failing right after its container is recreated on a new image, the diagnosis is *bad deploy* and

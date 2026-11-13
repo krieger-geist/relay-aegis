@@ -4,7 +4,7 @@
 #
 #   sudo bash setup.sh --admin-email you@example.com              domain from the server's public IP (sslip.io)
 #   sudo bash setup.sh --admin-email you@example.com --domain relay.example.com
-#   sudo bash setup.sh --version 1.3.1                             move to another release
+#   sudo bash setup.sh --version 1.4.0                             move to another release
 #
 # Copy this folder to the server first (see docs/AWS.md): it brings the Caddyfile and compose file with it.
 set -euo pipefail
@@ -12,7 +12,7 @@ set -euo pipefail
 DIR=/opt/relay-aegis
 REPO=https://github.com/krieger-geist/relay-aegis.git
 HERE="$(cd "$(dirname "$0")" && pwd)"
-VERSION=1.3.1
+VERSION=1.4.0
 DOMAIN=""
 ADMIN_EMAIL=""
 
