@@ -32,7 +32,17 @@ public record DiagnosticContext(
         NetworkObservation network,
         List<CodeSignal> code,
         History history,
-        List<String> unavailable) {
+        List<String> unavailable,
+        LatencyBaseline latency) {
+
+    /** Without a latency baseline (fewer than five healthy samples, or a caller that does not collect one). */
+    public DiagnosticContext(String incidentId, String component, Instant detectedAt, String applicationId, String applicationUrl,
+            String environment, String appContainer, List<HealthCheckEntity> recentChecks, List<EvidenceItemDto> incidentEvidence,
+            ContainerSnapshot runtime, LogExcerpt logs, List<DependencyState> dependencies, NetworkObservation network,
+            List<CodeSignal> code, History history, List<String> unavailable) {
+        this(incidentId, component, detectedAt, applicationId, applicationUrl, environment, appContainer, recentChecks, incidentEvidence,
+                runtime, logs, dependencies, network, code, history, unavailable, null);
+    }
 
     /** A dependency with its observed runtime state (null snapshot when it could not be inspected). */
     public record DependencyState(DependencyNode node, ContainerSnapshot snapshot) {
@@ -156,6 +166,10 @@ public record DiagnosticContext(
     public static EvidenceRef codeRef(CodeSignal signal) {
         return new EvidenceRef("CODE-" + signal.findingId(), "code", "Static analysis (unverified): " + signal.title()
                 + (signal.file() == null ? "" : " at " + signal.file() + (signal.line() == null ? "" : ":" + signal.line())));
+    }
+
+    public EvidenceRef latencyRef() {
+        return latency == null ? null : new EvidenceRef("LAT-" + (applicationId == null ? "app" : applicationId), "latency", latency.describe());
     }
 
     public EvidenceRef historyRef() {

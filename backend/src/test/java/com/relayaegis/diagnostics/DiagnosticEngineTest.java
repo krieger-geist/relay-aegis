@@ -351,4 +351,110 @@ class DiagnosticEngineTest {
         DiagnosticResult result = withUnsupported.diagnose(ctx().checks(refused()).runtime(exited(APP, 0)).build());
         assertTrue(result.ranked().stream().noneMatch(f -> f.patternId().equals("unsupported")));
     }
+
+    // ---- Phase 4: what changed, and user journeys -------------------------------------------------------------
+
+    private static ContainerSnapshot startedSecondsAgo(String name, long seconds) {
+        return container(name, "running", true, false, false, 0, 0, null, NOW.minusSeconds(seconds), null);
+    }
+
+    @Test
+    void aContainerStartJustBeforeTheFirstFailureIsCitedAsWhatChanged() {
+        // First failed check is 60 s ago; the container started 4 minutes before it.
+        DiagnosticResult result = diagnose(ctx().checks(DiagnosticFixtures.serverErrors(500)).runtime(startedSecondsAgo(APP, 60 + 240)));
+        DiagnosticFinding top = result.top().orElseThrow();
+        EvidenceRef change = top.supporting().stream().filter(ref -> ref.source().equals("change")).findFirst().orElseThrow();
+        assertEquals("CHG-" + APP, change.id());
+        assertTrue(change.summary().contains("4 min before the first failed check"), change.summary());
+        assertTrue(change.summary().contains("image relay-aegis-test-target:latest"), change.summary());
+    }
+
+    @Test
+    void oldStartsAndStartsAfterTheFailureAreNotChanges() {
+        DiagnosticResult old = diagnose(ctx().checks(DiagnosticFixtures.serverErrors(500)).runtime(startedSecondsAgo(APP, 2 * 3600)));
+        assertTrue(old.ranked().stream().flatMap(f -> f.supporting().stream()).noneMatch(ref -> ref.source().equals("change")));
+        DiagnosticResult after = diagnose(ctx().checks(DiagnosticFixtures.serverErrors(500)).runtime(startedSecondsAgo(APP, 30)));
+        assertTrue(after.ranked().stream().flatMap(f -> f.supporting().stream()).noneMatch(ref -> ref.source().equals("change")));
+    }
+
+    @Test
+    void aDependencyThatRestartedJustBeforeTheFailureIsCitedToo() {
+        DiagnosticResult result = diagnose(ctx().checks(DiagnosticFixtures.serverErrors(503)).runtime(running(APP))
+                .dependency(dependency("postgres", startedSecondsAgo("postgres", 60 + 90))));
+        assertTrue(result.top().orElseThrow().supporting().stream().anyMatch(ref -> ref.id().equals("CHG-postgres")
+                && ref.summary().contains("1 min before")), result.top().orElseThrow().supporting().toString());
+    }
+
+    private static com.relayaegis.entity.HealthCheckEntity journeyCheck(String id, String record, int secondsAgo) {
+        var check = DiagnosticFixtures.check(id, false, "journey_failed", 500,
+                "Health endpoint passed, but the user journey GET /orders returned HTTP 500", secondsAgo);
+        check.recordRef = record;
+        return check;
+    }
+
+    @Test
+    void aJourneyFailingOnTheSameRecordRecommendsQuarantiningIt() {
+        DiagnosticResult result = diagnose(ctx().checks(List.of(journeyCheck("CHK-2", "order-1003", 0), journeyCheck("CHK-1", "order-1003", 60)))
+                .runtime(running(APP)));
+        DiagnosticFinding top = result.top().orElseThrow();
+        assertEquals("user-journey-failure", top.patternId());
+        assertEquals(RecoveryActionType.QUARANTINE_RECORD, top.action());
+        assertEquals("order-1003", top.actionTarget());
+        assertTrue(top.missing().isEmpty() || top.missing().stream().noneMatch(m -> m.contains("same record")));
+        assertEveryFindingCitesEvidence(result);
+    }
+
+    @Test
+    void aJourneyFailureWithoutARecordOnlyAsksForInvestigation() {
+        DiagnosticResult result = diagnose(ctx().checks(List.of(journeyCheck("CHK-2", null, 0), journeyCheck("CHK-1", null, 60))).runtime(running(APP)));
+        DiagnosticFinding top = result.top().orElseThrow();
+        assertEquals("user-journey-failure", top.patternId());
+        assertEquals(RecoveryActionType.INVESTIGATE, top.action());
+    }
+
+    @Test
+    void differentRecordsOnConsecutiveFailuresLowerConfidence() {
+        DiagnosticFinding same = diagnose(ctx().checks(List.of(journeyCheck("CHK-2", "order-9", 0), journeyCheck("CHK-1", "order-9", 60)))).top().orElseThrow();
+        DiagnosticFinding mixed = diagnose(ctx().checks(List.of(journeyCheck("CHK-2", "order-9", 0), journeyCheck("CHK-1", "order-7", 60)))).top().orElseThrow();
+        assertTrue(mixed.confidence() < same.confidence());
+        assertTrue(mixed.missing().stream().anyMatch(m -> m.contains("same record")));
+    }
+
+    private static List<com.relayaegis.entity.HealthCheckEntity> history(long lastHealthyMs) {
+        List<com.relayaegis.entity.HealthCheckEntity> checks = new java.util.ArrayList<>(DiagnosticFixtures.timeouts());
+        var last = DiagnosticFixtures.check("CHK-H0", true, "healthy", 200, null, 120);
+        last.responseMs = lastHealthyMs;
+        checks.add(last);
+        long[] normal = {40, 42, 38, 45, 41, 39};
+        for (int k = 0; k < normal.length; k++) {
+            var c = DiagnosticFixtures.check("CHK-H" + (k + 1), true, "healthy", 200, null, 180 + k * 60);
+            c.responseMs = normal[k];
+            checks.add(c);
+        }
+        return checks;
+    }
+
+    @Test
+    void latencyBaselineIgnoresTheFailureStreakAndNeedsFiveSamples() {
+        LatencyBaseline baseline = LatencyBaseline.from(history(41));
+        assertEquals(7, baseline.samples());
+        assertEquals(41, baseline.medianMs());
+        assertEquals(41L, baseline.lastHealthyMs());
+        assertFalse(baseline.slowBeforeFailure());
+        assertEquals(null, LatencyBaseline.from(history(41).subList(0, 5)));
+    }
+
+    @Test
+    void slowingDownBeforeATimeoutIsCitedAndStrengthensTheTimeoutFinding() {
+        List<com.relayaegis.entity.HealthCheckEntity> checks = history(900);
+        LatencyBaseline slow = LatencyBaseline.from(checks);
+        assertTrue(slow.slowBeforeFailure());
+        assertTrue(slow.describe().contains("slowing down before it failed"), slow.describe());
+
+        DiagnosticFinding with = diagnose(ctx().checks(checks).runtime(running(APP)).latency(slow)).top().orElseThrow();
+        DiagnosticFinding without = diagnose(ctx().checks(checks).runtime(running(APP))).top().orElseThrow();
+        assertEquals("application-timeout", with.patternId());
+        assertTrue(with.supporting().stream().anyMatch(ref -> ref.source().equals("latency")));
+        assertTrue(with.confidence() > without.confidence());
+    }
 }

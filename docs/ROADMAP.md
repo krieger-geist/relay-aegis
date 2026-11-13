@@ -96,6 +96,10 @@ application has no database (unit tests only).
 **Done when:** the demo's failures heal on Kubernetes in CI, with measured times.
 
 ### Phase 4: Deeper detection (2–3 weeks)
+**Status: in progress.** Done: synthetic user journey checks, approved data quarantine through the application's own
+hook, "what changed" evidence from container starts, and a latency baseline. Still open: error-rate and SLO burn-rate
+alerts, log anomaly counts, resource trends, and rolling back a bad Docker deploy.
+
 - Synthetic transactions (e.g. load the Orders list), which closes today's corrupt-record limit, plus a policy-gated
   data-quarantine repair (move the row aside, never delete, require approval).
 - Error-rate and latency baselines (SLO burn-rate alerts), log anomaly counts, resource exhaustion trends.

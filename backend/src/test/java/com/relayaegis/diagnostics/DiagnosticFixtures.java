@@ -92,6 +92,7 @@ public final class DiagnosticFixtures {
         private History history = History.none();
         private String url = "http://test-target:8080/health";
         private String container = APP;
+        private LatencyBaseline latency;
 
         public Ctx checks(List<HealthCheckEntity> value) { checks = value; return this; }
         public Ctx runtime(ContainerSnapshot value) { runtime = value; return this; }
@@ -102,10 +103,11 @@ public final class DiagnosticFixtures {
         public Ctx history(History value) { history = value; return this; }
         public Ctx url(String value) { url = value; return this; }
         public Ctx noContainer() { container = null; return this; }
+        public Ctx latency(LatencyBaseline value) { latency = value; return this; }
 
         public DiagnosticContext build() {
             return new DiagnosticContext("INC-1", container == null ? "url-health-check" : "docker:" + container, NOW, "app-1", url, "Development",
-                    container, checks, List.of(), runtime, logs, List.copyOf(deps), network, List.copyOf(code), history, List.of());
+                    container, checks, List.of(), runtime, logs, List.copyOf(deps), network, List.copyOf(code), history, List.of(), latency);
         }
     }
 

@@ -213,6 +213,20 @@ cd chaos
 | `flood` | 20 000 API requests, 300 at a time |
 | `rotate-password` | Rotates the orders-service database password while the service keeps a hard-coded one |
 
+### User journeys and bad records (Phase 4, unreleased)
+
+A healthy `/health` does not mean users can work. Give an application a **user journey URL** (a real page, such as
+`/orders`) and RELAY calls it after the health check passes. If that page fails, RELAY opens an incident even though
+health is green. When the page names the record it could not read (`{"recordId": "..."}`), RELAY recommends moving
+that one record aside through the application's own **quarantine hook**. That always needs an operator to approve,
+and nothing is deleted. Try it with the bundled test target:
+
+1. Add an application: URL `http://test-target:3000/health`, User journey URL `http://test-target:3000/orders`,
+   Quarantine hook URL `http://test-target:3000/relay/quarantine`.
+2. Break one record: `docker compose exec test-target node -e "fetch('http://localhost:3000/chaos/corrupt-record',{method:'POST'}).then(r=>r.text()).then(console.log)"`
+3. Within two checks an incident opens: *Bad record order-1003 breaks the user journey*. Click **Run recovery** to
+   approve; RELAY verifies the Orders page works again.
+
 `measure` polls the application's own health endpoint every second, independently of RELAY, and records when it went
 down and when it came back. It then reads RELAY's incident record for the same failure (time to detect, time to
 recover) and appends a row to `chaos/results/chaos-results.csv`. `-Healing on|off` labels the run: *on* when the
