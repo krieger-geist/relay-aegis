@@ -33,7 +33,28 @@ public record DiagnosticContext(
         List<CodeSignal> code,
         History history,
         List<String> unavailable,
-        LatencyBaseline latency) {
+        LatencyBaseline latency,
+        DeployObservation deployment,
+        List<com.relayaegis.runtime.DeploymentTracker.ResourceSample> resources) {
+
+    /**
+     * What the application's container runs now and the last image that passed several consecutive health checks.
+     * {@code createdAt} is when the current container was created: a deploy recreates it, a restart does not.
+     */
+    public record DeployObservation(String container, String imageId, String imageRef, Instant createdAt,
+                                    String goodImageId, String goodImageRef, Instant goodAt) {
+        public boolean onDifferentImage() { return imageId != null && goodImageId != null && !imageId.equals(goodImageId); }
+        public static String shortId(String id) { return id == null ? "unknown" : id.startsWith("sha256:") && id.length() >= 19 ? id.substring(7, 19) : id; }
+    }
+
+    /** With a latency baseline but no deployment or resource history. */
+    public DiagnosticContext(String incidentId, String component, Instant detectedAt, String applicationId, String applicationUrl,
+            String environment, String appContainer, List<HealthCheckEntity> recentChecks, List<EvidenceItemDto> incidentEvidence,
+            ContainerSnapshot runtime, LogExcerpt logs, List<DependencyState> dependencies, NetworkObservation network,
+            List<CodeSignal> code, History history, List<String> unavailable, LatencyBaseline latency) {
+        this(incidentId, component, detectedAt, applicationId, applicationUrl, environment, appContainer, recentChecks, incidentEvidence,
+                runtime, logs, dependencies, network, code, history, unavailable, latency, null, List.of());
+    }
 
     /** Without a latency baseline (fewer than five healthy samples, or a caller that does not collect one). */
     public DiagnosticContext(String incidentId, String component, Instant detectedAt, String applicationId, String applicationUrl,
@@ -41,7 +62,13 @@ public record DiagnosticContext(
             ContainerSnapshot runtime, LogExcerpt logs, List<DependencyState> dependencies, NetworkObservation network,
             List<CodeSignal> code, History history, List<String> unavailable) {
         this(incidentId, component, detectedAt, applicationId, applicationUrl, environment, appContainer, recentChecks, incidentEvidence,
-                runtime, logs, dependencies, network, code, history, unavailable, null);
+                runtime, logs, dependencies, network, code, history, unavailable, null, null, List.of());
+    }
+
+    /** The first failed check of the current streak, if any. */
+    public Optional<HealthCheckEntity> firstFailure() {
+        List<HealthCheckEntity> streak = failureStreak();
+        return streak.isEmpty() ? Optional.empty() : Optional.of(streak.get(streak.size() - 1));
     }
 
     /** A dependency with its observed runtime state (null snapshot when it could not be inspected). */

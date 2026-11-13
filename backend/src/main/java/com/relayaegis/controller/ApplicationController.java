@@ -61,6 +61,20 @@ public class ApplicationController {
         return ApiEnvelope.of(data, provenance);
     }
 
+    private com.relayaegis.service.SloService slo;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setSlo(com.relayaegis.service.SloService slo) { this.slo = slo; }
+
+    /** Availability SLO, error-budget burn rates (5 min to 30 days) and whether a burn alert is firing. */
+    @GetMapping("/{id}/slo")
+    public ApiEnvelope<com.relayaegis.service.SloService.Status> slo(@PathVariable String id) {
+        applications.get(id);
+        if (slo == null) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "SLO tracking is not available.");
+        var status = slo.status(id);
+        return ApiEnvelope.of(status, status.windows().get(4).checks() == 0 ? "unavailable" : "live");
+    }
+
     /** Level 1 read-only runtime evidence: container, dependencies and log failure signals (inspection allowlist applies). */
     @GetMapping("/{id}/runtime")
     public ApiEnvelope<SystemRuntimeDto> runtime(@PathVariable String id) {

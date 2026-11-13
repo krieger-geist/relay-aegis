@@ -27,6 +27,10 @@ public class ApplicationEntity {
     @Column(length = 1000) public String journeyUrl;
     /** Optional hook on the same host that moves one bad record aside (never deletes); used only with approval. */
     @Column(length = 1000) public String quarantineUrl;
+    /** The last image (sha256 id) that passed several consecutive health checks; a bad deploy is rolled back to it. */
+    @Column(length = 100) public String lastGoodImageId;
+    @Column(length = 200) public String lastGoodImageRef;
+    public Instant lastGoodAt;
     @Column(nullable = false, length = 24) public String provenance;
     @Column(nullable = false) public Instant createdAt;
 

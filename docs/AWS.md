@@ -59,7 +59,7 @@ On the server:
 sudo bash ~/aws/setup.sh --admin-email you@example.com
 ```
 
-It installs Docker, adds a 2 GB swap file, downloads RELAY v1.3.1 into `/opt/relay-aegis`, writes `/opt/relay-aegis/.env`
+It installs Docker, adds a 2 GB swap file, downloads RELAY v1.4.0 into `/opt/relay-aegis`, writes `/opt/relay-aegis/.env`
 with a random database password and token secret, and starts everything. After 1 to 3 minutes it prints the address,
 for example `https://13-233-10-20.sslip.io`. [sslip.io](https://sslip.io) turns the IP address into a name, so no
 domain purchase is needed. With your own domain, point an A record at the server and pass `--domain relay.example.com`.

@@ -5,6 +5,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-13
+
 Phase 4: deeper detection.
 
 ### Added
@@ -21,9 +23,26 @@ Phase 4: deeper detection.
   healthy check at 3x the median or more is reported as a slowdown before the failure and strengthens timeout and
   5xx findings.
 - Test target: in-memory orders, `GET /orders`, `POST /chaos/corrupt-record` and a `/relay/quarantine` hook.
+- Bad-deploy rollback for Docker: an image becomes an application's *last good image* after 3 consecutive healthy
+  checks and is pinned as `relay-rollback/<container>:last-good`, so Docker keeps it. Failures that start within 30
+  minutes of the container being recreated on a new image are diagnosed as `bad-deploy` and recommend
+  `ROLLBACK_IMAGE`. The rollback recreates the container from its own settings with only the image changed (the bad
+  image's defaults are not copied), keeps the failing container stopped as `<name>-relay-bad-<time>`, and undoes the
+  swap if the new container fails to start. It runs through a separate `rollback-proxy` (Compose profile
+  `rollback`), is off unless `RELAY_DOCKER_ROLLBACK_ENABLED=true`, and the policy `policy-docker-rollback` starts at
+  *require approval*.
+- Error-budget burn alerts: an availability SLO per application (default 99.5%), with multi-window alerts (14.4x
+  over 1 h and the last 5 min; 6x over 6 h and the last 30 min). They catch intermittent failures that never fail
+  twice in a row, open a `slo-burn` incident and close once the 1 h burn rate drops below 1.
+  `GET /api/applications/{id}/slo` and an error-budget card on the application page.
+- Log anomaly evidence: error lines per minute after the failure began against the rate before it.
+- Resource trend evidence: memory climbing towards the container limit (with time to the limit), or CPU pinned at
+  90% or more, from samples taken with each health check.
+- Test target: `docker compose build --build-arg RELEASE=bad test-target` builds a broken release for the demo.
 
 ### Changed
-- Database migration V14 adds `journey_url` and `quarantine_url` to applications and `record_ref` to health checks.
+- Database migration V14 adds `journey_url` and `quarantine_url` to applications and `record_ref` to health checks;
+  V15 adds the last good image columns.
 
 ## [1.3.1] - 2026-11-13
 
@@ -185,7 +204,8 @@ First public release: the Sentry × Dezyne E'cole Hackathon 2026 system, with re
 ### Changed
 - Frontend image installs dependencies with `npm ci` from the lockfile for reproducible builds.
 
-[Unreleased]: https://github.com/krieger-geist/relay-aegis/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/krieger-geist/relay-aegis/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/krieger-geist/relay-aegis/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/krieger-geist/relay-aegis/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/krieger-geist/relay-aegis/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/krieger-geist/relay-aegis/compare/v1.1.0...v1.2.0

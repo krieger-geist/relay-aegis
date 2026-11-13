@@ -90,6 +90,14 @@ relay:
     cookie-secure: ${RELAY_AUTH_COOKIE_SECURE:auto}
     # Comma-separated emails that are granted ADMIN when they register; everyone else is USER.
     admin-emails: ${RELAY_AUTH_ADMIN_EMAILS:}
+  # An image becomes the "last good image" (the rollback target) after this many consecutive healthy checks.
+  deploys:
+    good-after-checks: ${RELAY_DEPLOYS_GOOD_AFTER_CHECKS:3}
+  # Availability SLO per application, and error-budget burn alerts (fast: 14.4x over 1 h; slow: 6x over 6 h).
+  slo:
+    availability-target: ${RELAY_SLO_AVAILABILITY_TARGET:0.995}
+    alerts-enabled: ${RELAY_SLO_ALERTS_ENABLED:true}
+    min-checks: ${RELAY_SLO_MIN_CHECKS:10}
   # Data quarantine hook (user journey, corrupt record): optional shared token sent as X-Relay-Token. Blank: none sent.
   quarantine:
     token: ${RELAY_QUARANTINE_TOKEN:}
@@ -117,6 +125,10 @@ relay:
       command: ${RELAY_DOCKER_COMMAND:docker}
       # Docker endpoint for recovery and inspection, e.g. tcp://docker-proxy:2375. Blank: the CLI's default socket.
       host: ${RELAY_DOCKER_HOST:}
+      # Bad-deploy rollback: recreate the container on its last good image, through its own proxy. Off by default.
+      rollback:
+        enabled: ${RELAY_DOCKER_ROLLBACK_ENABLED:false}
+        api-url: ${RELAY_DOCKER_ROLLBACK_API_URL:http://rollback-proxy:2375}
     # Recovery guard: attempts per incident, per-container cooldown, and a circuit breaker over failed recoveries.
     max-attempts-per-incident: ${RELAY_RECOVERY_MAX_ATTEMPTS:2}
     cooldown-seconds: ${RELAY_RECOVERY_COOLDOWN_SECONDS:60}

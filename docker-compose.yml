@@ -87,6 +87,37 @@ services:
       timeout: 5s
       retries: 3
 
+  # Docker rollback only (bad deploy -> last good image): read a container and an image, tag the last good image so
+  # Docker keeps it (relay-rollback/<container>:last-good), create the replacement,
+  # stop, rename and start containers, and reattach networks. Off by default: start it with `--profile rollback` and
+  # set RELAY_DOCKER_ROLLBACK_ENABLED=true. Host bind mounts are refused unless RELAY_ROLLBACK_BIND_MOUNTS_FROM lists
+  # the allowed host directories. The backend still only touches containers in RELAY_DOCKER_ALLOWED_CONTAINERS.
+  rollback-proxy:
+    image: wollomatic/socket-proxy:1.13.1
+    profiles: [rollback]
+    restart: unless-stopped
+    read_only: true
+    mem_limit: 64m
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    user: "0:0"
+    command:
+      - -loglevel=info
+      - -listenip=0.0.0.0
+      - -allowfrom=backend
+      - -allowhealthcheck
+      - -allowbindmountfrom=${RELAY_ROLLBACK_BIND_MOUNTS_FROM:-/relay-rollback-no-bind-mounts}
+      - -allowHEAD=(/v1\.[0-9]+)?/_ping
+      - -allowGET=((/v1\.[0-9]+)?/(_ping|version|containers/[A-Za-z0-9][A-Za-z0-9_.-]*/json|images/sha256:[0-9a-f]{64}/json))
+      - -allowPOST=(/v1\.[0-9]+/(containers/create|containers/[A-Za-z0-9][A-Za-z0-9_.-]*/(stop|start|rename)|networks/[A-Za-z0-9][A-Za-z0-9_.-]*/connect|images/sha256:[0-9a-f]{64}/tag))
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    healthcheck:
+      test: ["CMD", "./healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
   backend:
     build: ./backend
     ports:
@@ -104,6 +135,12 @@ services:
       # RELAY never sees the Docker socket: recovery and sandbox each reach Docker through their own allowlisting proxy.
       RELAY_DOCKER_HOST: tcp://docker-proxy:2375
       RELAY_SANDBOX_DOCKER_HOST: tcp://sandbox-proxy:2375
+      # Bad-deploy rollback through rollback-proxy (start it with --profile rollback). Off unless set to true.
+      RELAY_DOCKER_ROLLBACK_ENABLED: "${RELAY_DOCKER_ROLLBACK_ENABLED:-false}"
+      RELAY_DOCKER_ROLLBACK_API_URL: http://rollback-proxy:2375
+      RELAY_DEPLOYS_GOOD_AFTER_CHECKS: "${RELAY_DEPLOYS_GOOD_AFTER_CHECKS:-3}"
+      RELAY_SLO_AVAILABILITY_TARGET: "${RELAY_SLO_AVAILABILITY_TARGET:-0.995}"
+      RELAY_SLO_ALERTS_ENABLED: "${RELAY_SLO_ALERTS_ENABLED:-true}"
       # YAML runbooks from ./runbooks (new failure types without code changes), re-read every minute.
       RELAY_RUNBOOKS_DIR: /app/runbooks
       # Alerts from Alertmanager, Sentry and webhooks (POST /api/signals/...). Blank: those endpoints are off.

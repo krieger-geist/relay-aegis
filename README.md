@@ -213,7 +213,7 @@ cd chaos
 | `flood` | 20 000 API requests, 300 at a time |
 | `rotate-password` | Rotates the orders-service database password while the service keeps a hard-coded one |
 
-### User journeys and bad records (Phase 4, unreleased)
+### User journeys and bad records (v1.4.0)
 
 A healthy `/health` does not mean users can work. Give an application a **user journey URL** (a real page, such as
 `/orders`) and RELAY calls it after the health check passes. If that page fails, RELAY opens an incident even though
@@ -226,6 +226,25 @@ and nothing is deleted. Try it with the bundled test target:
 2. Break one record: `docker compose exec test-target node -e "fetch('http://localhost:3000/chaos/corrupt-record',{method:'POST'}).then(r=>r.text()).then(console.log)"`
 3. Within two checks an incident opens: *Bad record order-1003 breaks the user journey*. Click **Run recovery** to
    approve; RELAY verifies the Orders page works again.
+
+### Bad deploys (v1.4.0)
+
+RELAY remembers the last image that passed 3 health checks in a row and tags it so Docker keeps it. If an
+application starts failing right after its container is recreated on a new image, the diagnosis is *bad deploy* and
+the recommended action is to roll back to that image. Rollback is off by default because it needs more Docker rights
+(create, stop, rename) than the rest of RELAY; those rights live in their own proxy. Try it:
+
+1. Start with rollback on: `RELAY_DOCKER_ROLLBACK_ENABLED=true docker compose --profile rollback up -d --build`.
+2. Add an application: URL `http://test-target:3000/health`, Docker container `relay-aegis-test-target`. Wait
+   about 3 checks so its image becomes the last good image.
+3. Deploy a broken release: `docker compose build --build-arg RELEASE=bad test-target`, then
+   `docker compose up -d --no-deps test-target`.
+4. An incident opens: *Bad deploy: new image ... fails since its rollout*. Click **Run recovery** to approve. RELAY
+   recreates the container on the last good image and verifies it; the broken container is kept, stopped, as
+   `relay-aegis-test-target-relay-bad-<time>`.
+
+The rolled-back container runs the old image directly, so fix the release before the next `docker compose up`, or
+Compose will recreate it on the broken image again.
 
 `measure` polls the application's own health endpoint every second, independently of RELAY, and records when it went
 down and when it came back. It then reads RELAY's incident record for the same failure (time to detect, time to
