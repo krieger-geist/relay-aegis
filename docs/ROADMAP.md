@@ -36,7 +36,7 @@ and policy-gated, and AI only proposes. That is exactly what stops companies tru
 | Runbooks | Done in Phase 2 (v1.2.0): YAML runbooks in Git, validated on load | Teams want reviewed, versioned runbooks as code |
 | Code healing | Two fix strategies; personal access token | Breadth, and GitHub App auth is the standard |
 | Proof | Results from rehearsals, not continuous measurement | MTTD/MTTR trends and SLOs are how reliability is judged |
-| Product | Single tenant, local accounts | Teams, SSO and audit export are required to adopt |
+| Product | Single tenant, local accounts; multi-tenant plan written for Phase 7 | Teams, SSO and audit export are required to adopt |
 
 ## Phased plan
 
@@ -116,9 +116,42 @@ application has no database (unit tests only).
 
 ### Phase 7: Product readiness
 - Organisations, teams and role-based access per system; OIDC single sign-on.
+- Multi-tenant hosted RELAY (plan below): anyone signs up through the public link and connects only their own systems.
 - Audit log export; data retention settings; hardened deployment guide.
 - More notifiers: email and PagerDuty (Events API v2), next to Slack and the webhook.
 - Documentation site, one-command install, hosted read-only demo.
+
+## Multi-tenant plan (Phase 7)
+
+Goal: one public RELAY where anyone can sign up, connect their own systems, and never see or touch anyone else's.
+Today every signed-in account sees all applications, incidents and policies, which is fine for one team and not for
+strangers. Two parts, in this order:
+
+**1. Isolation: no one sees other people's data**
+- A workspace (tenant) per sign-up, with invited members and roles per workspace (owner, operator, viewer).
+- A `tenant_id` on every row: applications, health checks, incidents, recovery actions, assessments, repairs, policies,
+  runbooks and notifications. Every query is filtered by the caller's workspace.
+- PostgreSQL row-level security as a second guard, so a missing filter in code still returns nothing from another
+  workspace.
+- Recovery policies, allowlists and runbooks per workspace; the instance admin keeps global limits.
+- Quotas per workspace (applications, check frequency, assessments, stored history) on top of today's per-account limits.
+- Tests that try to cross the boundary: workspace A reading, approving or restarting anything of workspace B fails.
+- Account and data deletion on request; retention settings; a short privacy note.
+
+**2. Connection: an agent, not inbound access**
+A public RELAY cannot safely reach private networks or hold Docker or Kubernetes access to strangers' machines. So:
+- A small RELAY agent runs next to the user's systems, started with one command and a workspace token.
+- The agent connects outward over HTTPS; no inbound ports are opened on the user's side.
+- The agent runs health checks and executes approved actions locally, limited to its own allowlist and policies. The
+  hosted RELAY stores evidence and decisions and never holds credentials to the user's systems.
+- Tokens are scoped to one workspace, can be rotated and revoked, and every agent action is in the audit log.
+- Agent releases are signed, like today's images.
+
+**Order of work:** workspaces and isolation, then the agent, then quotas and abuse protection, then a larger server or
+managed database (RDS with backups) before inviting real users.
+
+**Done when:** two workspaces on one instance each connect an agent, see only their own systems and incidents, heal
+their own failures, and every cross-workspace attempt in the test suite is refused.
 
 ## Who works on this problem
 
