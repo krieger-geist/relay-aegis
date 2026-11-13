@@ -42,23 +42,26 @@ public class VerificationEngine {
 
     public VerificationResult verify(ApplicationEntity app, RecoveryDecision decision) {
         Instant deadline = Instant.now().plus(timeout);
+        // A quarantined record is data, not a container: the proof is that the user journey works again.
+        boolean dataAction = decision.action() == RecoveryActionType.QUARANTINE_RECORD;
+        String target = dataAction ? null : decision.target();
         List<String> observations = new ArrayList<>();
         int consecutiveHealthy = 0;
-        boolean targetObserved = decision.target() == null || !inspector.canInspect(decision.target());
+        boolean targetObserved = target == null || !inspector.canInspect(target);
         String lastTarget = targetObserved ? "target state not inspectable; verified through health checks only" : "not yet observed";
         String lastCheck = "no health check completed";
         while (Instant.now().isBefore(deadline)) {
             boolean targetOk = true;
-            if (decision.target() != null && inspector.canInspect(decision.target())) {
-                ContainerSnapshot snapshot = inspector.inspect(decision.target()).orElse(null);
+            if (target != null && inspector.canInspect(target)) {
+                ContainerSnapshot snapshot = inspector.inspect(target).orElse(null);
                 if (snapshot != null) {
                     lastTarget = snapshot.describe();
                     targetOk = snapshot.exists() && snapshot.running() && !snapshot.restarting() && !"unhealthy".equals(snapshot.healthStatus())
                             && !"starting".equals(snapshot.healthStatus());
                     if (snapshot.exists() && !snapshot.running() && !snapshot.restarting() && snapshot.finishedAt() != null
                             && snapshot.startedAt() != null && snapshot.finishedAt().isAfter(snapshot.startedAt())) {
-                        observations.add("Target " + decision.target() + ": " + lastTarget);
-                        return new VerificationResult("failed", "The container " + decision.target() + " stopped again after the recovery action ("
+                        observations.add("Target " + target + ": " + lastTarget);
+                        return new VerificationResult("failed", "The container " + target + " stopped again after the recovery action ("
                                 + lastTarget + ").", List.copyOf(observations));
                     }
                 } else {
@@ -76,7 +79,7 @@ public class VerificationEngine {
             if (targetOk && consecutiveHealthy >= requiredHealthyChecks) {
                 observations.add("Target: " + lastTarget);
                 observations.add(requiredHealthyChecks + " consecutive healthy checks after the action");
-                return new VerificationResult("passed", "Verified: " + (decision.target() == null ? "" : decision.target() + " is running and ")
+                return new VerificationResult("passed", "Verified: " + (dataAction ? "record " + decision.target() + " was moved aside and " : target == null ? "" : target + " is running and ")
                         + "the application passed " + requiredHealthyChecks + " consecutive health checks after the action.", List.copyOf(observations));
             }
             sleep(pollInterval);

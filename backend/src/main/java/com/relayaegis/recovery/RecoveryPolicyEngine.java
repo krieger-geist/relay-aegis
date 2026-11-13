@@ -29,6 +29,7 @@ public class RecoveryPolicyEngine {
     public static final String POLICY_ROLLBACK = "policy-kubernetes-rollback";
     public static final String POLICY_SCALE = "policy-kubernetes-scale";
     public static final String POLICY_DELETE_POD = "policy-kubernetes-delete-pod";
+    public static final String POLICY_QUARANTINE = "policy-data-quarantine";
 
     private final RecoveryPolicyRepository policies;
     private final DockerControlService docker;
@@ -77,7 +78,17 @@ public class RecoveryPolicyEngine {
         if (target == null || target.isBlank()) {
             return RecoveryDecision.blocked(action, null, null, null, pattern, confidence, reasons, "No container is linked to this recovery action.", false);
         }
-        if (KubernetesTarget.is(target)) {
+        if (action == RecoveryActionType.QUARANTINE_RECORD) {
+            // Data actions never touch Docker or Kubernetes: they call the application's own quarantine hook.
+            if (app.quarantineUrl == null || app.quarantineUrl.isBlank()) {
+                return RecoveryDecision.blocked(action, target, POLICY_QUARANTINE, null, pattern, confidence, reasons,
+                        "This application has no quarantine hook configured, so RELAY cannot move the record aside. Repair record " + target + " by hand.", false);
+            }
+            if (automatic) {
+                return RecoveryDecision.blocked(action, target, POLICY_QUARANTINE, null, pattern, confidence, reasons,
+                        "Quarantining data always needs an operator; use Run recovery to approve.", true);
+            }
+        } else if (KubernetesTarget.is(target)) {
             if (!kubernetes.isEnabled()) {
                 return RecoveryDecision.blocked(action, target, null, null, pattern, confidence, reasons, "Kubernetes recovery is disabled by configuration.", false);
             }
@@ -100,6 +111,7 @@ public class RecoveryPolicyEngine {
             case ROLLOUT_UNDO -> POLICY_ROLLBACK;
             case SCALE_WORKLOAD -> POLICY_SCALE;
             case DELETE_POD -> POLICY_DELETE_POD;
+            case QUARANTINE_RECORD -> POLICY_QUARANTINE;
             default -> POLICY_RESTART;
         };
         RecoveryPolicyEntity policy = policies.findById(policyId).orElse(null);

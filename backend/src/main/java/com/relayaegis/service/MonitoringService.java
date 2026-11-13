@@ -92,7 +92,9 @@ public class MonitoringService {
             ApplicationEntity app = applications.findEntity(applicationId);
             URI uri = targetUrlPolicy.validate(app.url);
             // The network call happens outside any transaction so a slow target cannot hold a DB connection.
-            Probe probe = probe(uri);
+            Probe health = probe(uri);
+            Probe probe = MonitoringRules.HEALTHY.equals(health.outcome()) && app.journeyUrl != null && !app.journeyUrl.isBlank()
+                    ? probeJourney(targetUrlPolicy.validate(app.journeyUrl), health) : health;
             HealthCheckResult result = transactions.execute(status -> record(applicationId, probe));
             metrics.healthCheck(applicationId, probe.outcome(), probe.elapsedMs());
             return result;
@@ -101,7 +103,56 @@ public class MonitoringService {
         }
     }
 
-    record Probe(Instant finishedAt, long elapsedMs, String outcome, Integer statusCode, String message) {}
+    record Probe(Instant finishedAt, long elapsedMs, String outcome, Integer statusCode, String message, String recordRef) {
+        Probe(Instant finishedAt, long elapsedMs, String outcome, Integer statusCode, String message) {
+            this(finishedAt, elapsedMs, outcome, statusCode, message, null);
+        }
+    }
+
+    private static final int JOURNEY_BODY_LIMIT = 16 * 1024;
+    private static final java.util.regex.Pattern RECORD_ID = java.util.regex.Pattern.compile("\"recordId\"\\s*:\\s*\"([A-Za-z0-9._:-]{1,120})\"");
+    private static final java.util.regex.Pattern ERROR_TEXT = java.util.regex.Pattern.compile("\"error\"\\s*:\\s*\"([^\"\\\\]{1,200})\"");
+
+    /**
+     * Calls the user journey after the health endpoint passed. A 2xx keeps the check healthy. Anything else is
+     * journey_failed: the application is up, but a user would see an error. When the error body names the record it
+     * could not read ({"recordId": "..."}), that reference is kept so diagnosis can propose moving that one record aside.
+     * Only a bounded prefix of the body is read and only the record id and error text are stored.
+     */
+    Probe probeJourney(URI uri, Probe health) {
+        long start = System.nanoTime();
+        String path = uri.getRawPath() == null || uri.getRawPath().isBlank() ? "/" : uri.getRawPath();
+        try {
+            HttpRequest request = HttpRequest.newBuilder(uri).timeout(Duration.ofMillis(timeoutMs))
+                    .header("User-Agent", "RELAY-AEGIS-JourneyCheck/0.1").header("Accept", "application/json").GET().build();
+            HttpResponse<java.io.InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            String body;
+            try (java.io.InputStream in = response.body()) {
+                body = new String(in.readNBytes(JOURNEY_BODY_LIMIT), java.nio.charset.StandardCharsets.UTF_8);
+            }
+            long elapsed = health.elapsedMs() + Math.max(1, Duration.ofNanos(System.nanoTime() - start).toMillis());
+            int status = response.statusCode();
+            if (status >= 200 && status < 300) {
+                return new Probe(Instant.now(), elapsed, MonitoringRules.HEALTHY, health.statusCode(),
+                        health.message() + " User journey GET " + path + " returned HTTP " + status + ".", null);
+            }
+            java.util.regex.Matcher record = RECORD_ID.matcher(body);
+            java.util.regex.Matcher error = ERROR_TEXT.matcher(body);
+            String recordRef = record.find() ? record.group(1) : null;
+            String detail = error.find() ? ": " + error.group(1) : "";
+            return new Probe(Instant.now(), elapsed, MonitoringRules.JOURNEY_FAILED, status,
+                    "Health endpoint passed, but the user journey GET " + path + " returned HTTP " + status + detail
+                            + (recordRef == null ? "." : " (record " + recordRef + ")."), recordRef);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            return new Probe(Instant.now(), health.elapsedMs(), MonitoringRules.JOURNEY_FAILED, null,
+                    "Health endpoint passed, but the user journey GET " + path + " was interrupted.", null);
+        } catch (Exception ex) {
+            long elapsed = health.elapsedMs() + Math.max(1, Duration.ofNanos(System.nanoTime() - start).toMillis());
+            return new Probe(Instant.now(), elapsed, MonitoringRules.JOURNEY_FAILED, null,
+                    "Health endpoint passed, but the user journey GET " + path + " failed: " + classifyFailure(ex, timeoutMs), null);
+        }
+    }
 
     Probe probe(URI uri) {
         long start = System.nanoTime();
@@ -144,6 +195,7 @@ public class MonitoringService {
         check.errorMessage = healthy ? null : probe.message();
         check.outcome = probe.outcome();
         check.statusCode = probe.statusCode();
+        check.recordRef = probe.recordRef();
         check.provenance = "live";
         healthChecks.save(check);
 
@@ -178,6 +230,8 @@ public class MonitoringService {
         // The title states what was observed (the application's health check); the cause — container, dependency or
         // application — is established by diagnosis, so a linked container is never presumed to be the failure.
         String title = MonitoringRules.UNREACHABLE.equals(probe.outcome()) ? "Application unreachable"
+                : MonitoringRules.JOURNEY_FAILED.equals(probe.outcome())
+                ? "User journey failing" + (probe.statusCode() == null ? "" : " (HTTP " + probe.statusCode() + ")") + " while health passes"
                 : "Health endpoint returned HTTP " + probe.statusCode();
         String summary = probe.message() + " Observed in " + failureThreshold + " consecutive check(s).";
         var incident = incidentService.create(app, title, "Sev-2", component, summary, "live");

@@ -22,5 +22,7 @@ public class HealthCheckEntity {
     /** healthy | degraded (HTTP response but not 2xx) | unreachable (no HTTP response). Null on rows recorded before V4. */
     @Column(length = 24) public String outcome;
     public Integer statusCode;
+    /** The record a failing user journey named as unreadable (outcome journey_failed), when it named one. */
+    @Column(length = 120) public String recordRef;
     public HealthCheckEntity() {}
 }

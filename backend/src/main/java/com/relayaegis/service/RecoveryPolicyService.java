@@ -24,6 +24,8 @@ public class RecoveryPolicyService {
         if (request.mode() == null || !List.of("disabled", "require_approval", "allow_automatically").contains(request.mode()))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Mode must be disabled, require_approval, or allow_automatically.");
         RecoveryPolicyEntity policy = policies.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Recovery policy not found."));
+        if ("allow_automatically".equals(request.mode()) && com.relayaegis.recovery.RecoveryPolicyEngine.POLICY_QUARANTINE.equals(policy.id))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Quarantining data always needs an operator: this policy cannot run automatically.");
         if ("allow_automatically".equals(request.mode()) && !AUTO_CONFIRMATION.equals(request.confirmation()))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Type CONFIRM-AUTO-REPAIR to enable automatic recovery.");
         policy.mode = request.mode();
@@ -44,6 +46,9 @@ public class RecoveryPolicyService {
      */
     public void seedDefaultsIfEmpty() {
         seedKubernetes();
+        if (!policies.existsById("policy-data-quarantine")) {
+            save("policy-data-quarantine", "Quarantine a bad data record", "Move one record that breaks the user journey aside through the application's own quarantine hook. Nothing is deleted, and it always needs an operator.", "require_approval", "medium", "Applications with a quarantine hook configured (never automatic)");
+        }
         if (!policies.existsById("policy-restart")) {
             save("policy-restart", "Restart an unhealthy container", "Start or restart only explicitly allowlisted containers after policy approval; every action is verified afterwards.", "require_approval", "high", "Configured non-production container allowlist");
         }

@@ -229,7 +229,7 @@ public class RecoveryOrchestrationService {
             }
             attemptsThisRun++;
             guard.recordAttempt(decision.target(), incidentId, Instant.now());
-            RecoveryExecutor.ExecutionResult execution = executor.execute(decision, app.dockerContainer);
+            RecoveryExecutor.ExecutionResult execution = executor.execute(decision, app, incidentId);
             entry = journal.executed(entry, execution);
             lastExecution = execution.detail();
             appendEvidence(incidentId, "recovery", "Recovery attempt " + entry.attempt + ": " + decision.action(), execution.detail());

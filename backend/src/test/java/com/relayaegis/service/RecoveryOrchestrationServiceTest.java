@@ -130,7 +130,7 @@ class RecoveryOrchestrationServiceTest {
         var conflict = assertThrows(ResponseStatusException.class, () -> recovery.beginRecovery("INC-1"));
 
         assertEquals(HttpStatus.CONFLICT, conflict.getStatusCode());
-        verify(executor, never()).execute(any(), any());
+        verify(executor, never()).execute(any(), any(), any());
     }
 
     @Test
@@ -156,7 +156,7 @@ class RecoveryOrchestrationServiceTest {
     @Test
     void successfulRecoveryIsVerifiedAndRecordedWithItsPolicyBasis() {
         diagnosed(RecoveryActionType.START_CONTAINER, 0.92);
-        when(executor.execute(any(), any())).thenReturn(new RecoveryExecutor.ExecutionResult(true, false, "Started container " + CONTAINER + "."));
+        when(executor.execute(any(), any(), any())).thenReturn(new RecoveryExecutor.ExecutionResult(true, false, "Started container " + CONTAINER + "."));
         when(verification.verify(any(), any())).thenReturn(new VerificationEngine.VerificationResult("passed", "Verified: 2 healthy checks.", List.of()));
 
         service(Runnable::run).beginRecovery("INC-1");
@@ -178,12 +178,12 @@ class RecoveryOrchestrationServiceTest {
     @Test
     void executedCommandWithoutPassingVerificationIsNeverSuccessAndRetriesStopAtTheLimit() {
         diagnosed(RecoveryActionType.RESTART_CONTAINER, 0.85);
-        when(executor.execute(any(), any())).thenReturn(new RecoveryExecutor.ExecutionResult(true, false, "Restarted container."));
+        when(executor.execute(any(), any(), any())).thenReturn(new RecoveryExecutor.ExecutionResult(true, false, "Restarted container."));
         when(verification.verify(any(), any())).thenReturn(new VerificationEngine.VerificationResult("failed", "The container stopped again.", List.of()));
 
         service(Runnable::run).beginRecovery("INC-1");
 
-        verify(executor, times(2)).execute(any(), any()); // max-attempts-per-incident = 2
+        verify(executor, times(2)).execute(any(), any(), any()); // max-attempts-per-incident = 2
         assertEquals("unresolved", current.state);
         assertEquals("failed", current.verificationStatus);
         assertEquals("recovery_failed", current.status);
@@ -196,7 +196,7 @@ class RecoveryOrchestrationServiceTest {
     @Test
     void verificationTimeoutNeedsReview() {
         diagnosed(RecoveryActionType.RESTART_CONTAINER, 0.85);
-        when(executor.execute(any(), any())).thenReturn(new RecoveryExecutor.ExecutionResult(true, false, "Restarted container."));
+        when(executor.execute(any(), any(), any())).thenReturn(new RecoveryExecutor.ExecutionResult(true, false, "Restarted container."));
         when(verification.verify(any(), any())).thenReturn(new VerificationEngine.VerificationResult("timed_out", "Not verified within 30 s.", List.of()));
 
         service(Runnable::run).beginRecovery("INC-1");
@@ -208,7 +208,7 @@ class RecoveryOrchestrationServiceTest {
     @Test
     void failedExecutionIsRecordedAsFailedVerificationWithoutCheckingHealth() {
         diagnosed(RecoveryActionType.START_CONTAINER, 0.92);
-        when(executor.execute(any(), any())).thenReturn(new RecoveryExecutor.ExecutionResult(false, false, "Docker operation failed."));
+        when(executor.execute(any(), any(), any())).thenReturn(new RecoveryExecutor.ExecutionResult(false, false, "Docker operation failed."));
 
         service(Runnable::run).beginRecovery("INC-1");
 
@@ -222,7 +222,7 @@ class RecoveryOrchestrationServiceTest {
 
         assertFalse(service(Runnable::run).beginAutomaticRecovery("INC-1"));
 
-        verify(executor, never()).execute(any(), any());
+        verify(executor, never()).execute(any(), any(), any());
         assertTrue(evidence.stream().anyMatch(e -> e.detail().contains("requires operator approval")));
         assertEquals(1, meters.get("relay.recovery.decisions").tags("decision", "requires_approval", "mode", "automatic").counter().count());
         assertTrue(meters.find("relay.recovery.attempts").counters().isEmpty());
@@ -232,7 +232,7 @@ class RecoveryOrchestrationServiceTest {
     void automaticRecoveryRunsUnderAllowAutomatically() {
         policy.mode = "allow_automatically";
         diagnosed(RecoveryActionType.START_CONTAINER, 0.92);
-        when(executor.execute(any(), any())).thenReturn(new RecoveryExecutor.ExecutionResult(true, false, "Started."));
+        when(executor.execute(any(), any(), any())).thenReturn(new RecoveryExecutor.ExecutionResult(true, false, "Started."));
         when(verification.verify(any(), any())).thenReturn(new VerificationEngine.VerificationResult("passed", "Verified.", List.of()));
 
         assertTrue(service(Runnable::run).beginAutomaticRecovery("INC-1"));
@@ -245,7 +245,7 @@ class RecoveryOrchestrationServiceTest {
         diagnosed(RecoveryActionType.ESCALATE, 0.9);
 
         assertFalse(service(Runnable::run).beginAutomaticRecovery("INC-1"));
-        verify(executor, never()).execute(any(), any());
+        verify(executor, never()).execute(any(), any(), any());
     }
 
     @Test
@@ -257,7 +257,7 @@ class RecoveryOrchestrationServiceTest {
 
         assertEquals(HttpStatus.FORBIDDEN, blocked.getStatusCode());
         assertTrue(blocked.getReason().startsWith("Cooldown"));
-        verify(executor, never()).execute(any(), any());
+        verify(executor, never()).execute(any(), any(), any());
     }
 
     @Test
@@ -269,7 +269,7 @@ class RecoveryOrchestrationServiceTest {
         var blocked = assertThrows(ResponseStatusException.class, () -> service(Runnable::run).beginRecovery("INC-1"));
 
         assertTrue(blocked.getReason().startsWith("Circuit breaker open"));
-        verify(executor, never()).execute(any(), any());
+        verify(executor, never()).execute(any(), any(), any());
     }
 
     @Test
@@ -294,7 +294,7 @@ class RecoveryOrchestrationServiceTest {
         var manual = assertThrows(ResponseStatusException.class, () -> recovery.beginRecovery("INC-1"));
 
         assertEquals(HttpStatus.FORBIDDEN, manual.getStatusCode());
-        verify(executor, never()).execute(any(), any());
+        verify(executor, never()).execute(any(), any(), any());
         verify(verification, never()).verify(any(), any());
         assertEquals(2, evidence.stream().filter(e -> e.type().equals("recovery")).count(), "automatic and operator decisions are both recorded");
         assertTrue(evidence.stream().allMatch(e -> e.detail().startsWith("Not authorized: START_CONTAINER")
@@ -306,7 +306,7 @@ class RecoveryOrchestrationServiceTest {
     @Test
     void eachAttemptIsJournaledFromIntentToVerification() {
         diagnosed(RecoveryActionType.START_CONTAINER, 0.92);
-        when(executor.execute(any(), any())).thenAnswer(inv -> {
+        when(executor.execute(any(), any(), any())).thenAnswer(inv -> {
             assertEquals(ActionJournal.INTENDED, journalRows.get(0).phase, "the intent is committed before Docker is called");
             return new RecoveryExecutor.ExecutionResult(true, false, "Started container " + CONTAINER + ".");
         });
@@ -327,7 +327,7 @@ class RecoveryOrchestrationServiceTest {
     @Test
     void failedVerificationRetriesAreJournaledAsSeparateAttemptsOfOneRun() {
         diagnosed(RecoveryActionType.RESTART_CONTAINER, 0.85);
-        when(executor.execute(any(), any())).thenReturn(new RecoveryExecutor.ExecutionResult(true, false, "Restarted container."));
+        when(executor.execute(any(), any(), any())).thenReturn(new RecoveryExecutor.ExecutionResult(true, false, "Restarted container."));
         when(verification.verify(any(), any())).thenReturn(new VerificationEngine.VerificationResult("failed", "Still down.", List.of()));
 
         service(Runnable::run).beginRecovery("INC-1");
@@ -344,7 +344,7 @@ class RecoveryOrchestrationServiceTest {
 
         service(Runnable::run).beginRecovery("INC-1");
 
-        verify(executor, never()).execute(any(), any());
+        verify(executor, never()).execute(any(), any(), any());
         assertEquals("unresolved", current.state);
         assertEquals("failed", current.verificationStatus);
         assertTrue(evidence.stream().anyMatch(e -> e.title().equals("Recovery stopped")));
@@ -357,7 +357,7 @@ class RecoveryOrchestrationServiceTest {
 
         service(Runnable::run).resumeInterruptedRecoveries();
 
-        verify(executor, never()).execute(any(), any());
+        verify(executor, never()).execute(any(), any(), any());
         assertEquals("recovered", current.state);
         assertEquals("passed", current.verificationStatus);
         RecoveryActionEntity row = journalRows.get(0);
@@ -371,12 +371,12 @@ class RecoveryOrchestrationServiceTest {
     @Test
     void restartAfterAnExecutedAttemptThatStillFailsRetriesOnlyWithinTheAttemptLimit() {
         crashedDuring(1, ActionJournal.EXECUTED);
-        when(executor.execute(any(), any())).thenReturn(new RecoveryExecutor.ExecutionResult(true, false, "Restarted container."));
+        when(executor.execute(any(), any(), any())).thenReturn(new RecoveryExecutor.ExecutionResult(true, false, "Restarted container."));
         when(verification.verify(any(), any())).thenReturn(new VerificationEngine.VerificationResult("failed", "Still down.", List.of()));
 
         service(Runnable::run).resumeInterruptedRecoveries();
 
-        verify(executor, times(1)).execute(any(), any()); // attempt 1 was already executed; limit 2
+        verify(executor, times(1)).execute(any(), any(), any()); // attempt 1 was already executed; limit 2
         assertEquals(List.of(1, 2), journalRows.stream().map(r -> r.attempt).toList());
         assertEquals(ActionJournal.NOT_VERIFIED, journalRows.get(0).phase);
         assertEquals(1, journalRows.stream().map(r -> r.runId).distinct().count(), "the retry continues the interrupted run");
@@ -392,7 +392,7 @@ class RecoveryOrchestrationServiceTest {
 
         service(Runnable::run).resumeInterruptedRecoveries();
 
-        verify(executor, never()).execute(any(), any());
+        verify(executor, never()).execute(any(), any(), any());
         assertEquals(2, journalRows.size());
         assertEquals("recovery_failed", current.status);
     }
@@ -404,7 +404,7 @@ class RecoveryOrchestrationServiceTest {
 
         service(Runnable::run).resumeInterruptedRecoveries();
 
-        verify(executor, never()).execute(any(), any());
+        verify(executor, never()).execute(any(), any(), any());
         verify(verification, never()).verify(any(), any());
         assertEquals("unresolved", current.state);
         assertEquals("needs_review", current.status);
@@ -420,7 +420,7 @@ class RecoveryOrchestrationServiceTest {
         var refused = assertThrows(ResponseStatusException.class, () -> service(Runnable::run).beginRecovery("INC-1"));
 
         assertEquals(HttpStatus.SERVICE_UNAVAILABLE, refused.getStatusCode());
-        verify(executor, never()).execute(any(), any());
+        verify(executor, never()).execute(any(), any(), any());
     }
 
     @Test
@@ -429,12 +429,12 @@ class RecoveryOrchestrationServiceTest {
         // leader for the decision and attempt 1; lost before the retry
         when(leadership.isLeader()).thenReturn(true, true, false);
         diagnosed(RecoveryActionType.START_CONTAINER, 0.92);
-        when(executor.execute(any(), any())).thenReturn(new RecoveryExecutor.ExecutionResult(true, false, "Started."));
+        when(executor.execute(any(), any(), any())).thenReturn(new RecoveryExecutor.ExecutionResult(true, false, "Started."));
         when(verification.verify(any(), any())).thenReturn(new VerificationEngine.VerificationResult("failed", "Still down.", List.of()));
 
         service(Runnable::run).beginRecovery("INC-1");
 
-        verify(executor, times(1)).execute(any(), any());
+        verify(executor, times(1)).execute(any(), any(), any());
         assertEquals("action_taken", current.state, "no outcome is recorded by an instance that is no longer the leader");
         assertEquals(1, journalRows.size());
         assertEquals(ActionJournal.NOT_VERIFIED, journalRows.get(0).phase);
