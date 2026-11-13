@@ -34,7 +34,9 @@ export function IncidentDetailPage() {
   const verified = item.verification.status === 'passed';
   const resolvedByObservation = item.state === 'recovered' && !verified;
   const running = ['action_taken', 'verifying'].includes(item.state);
-  const hasRunbook = item.component.startsWith('docker:') || item.component.startsWith('k8s:');
+  // A data quarantine runs through the application's own hook, so it needs no container: the operator approves it here.
+  const quarantine = item.diagnosis?.engine?.hypotheses?.[0]?.recommendedAction === 'QUARANTINE_RECORD';
+  const hasRunbook = item.component.startsWith('docker:') || item.component.startsWith('k8s:') || quarantine;
   const recommendation = recommendedNextStep(item);
   const recoveryLog = recoveryRecords(item.evidence);
   const observed = item.evidence.filter((evidence) => evidence.type !== 'recovery' && evidence.type !== 'verification');
@@ -68,7 +70,7 @@ export function IncidentDetailPage() {
         <CodeRootCause incident={item} />
         <Panel title="Recommended action" subtitle="The policy engine must approve every action" provenance={item.provenance}>
           <div className="recommended-action"><div className="recommended-icon"><Search size={16} /></div><div><div className="recommended-title">{recommendation.title}</div><div className="recommended-detail">{recommendation.detail}</div></div></div>
-          {hasRunbook ? <div className="policy-indicator"><LockKeyhole size={13} /><span>Backend policy and the configured container allowlist are checked before execution.</span></div> : <div className="warning-box"><LockKeyhole size={13} /> No approved automatic recovery runbook is configured for this component.</div>}
+          {hasRunbook ? <div className="policy-indicator"><LockKeyhole size={13} /><span>{quarantine ? "Approving moves this one record aside through the application's own quarantine hook. Nothing is deleted." : 'Backend policy and the configured container allowlist are checked before execution.'}</span></div> : <div className="warning-box"><LockKeyhole size={13} /> No approved automatic recovery runbook is configured for this component.</div>}
           {hasRunbook && !resolvedByObservation ? <button className="btn btn-primary full-width" onClick={() => recover.mutate()} disabled={running || verified || recover.isPending}><Play size={13} /> Run recovery</button> : null}
         </Panel>
         <Panel title="Application context" subtitle="Registered target metadata" provenance={item.provenance}><div className="context-kv"><div><span>Application</span><strong>{item.applicationName}</strong></div><div><span>Component</span><strong className="mono">{item.component}</strong></div><div><span>Detected</span><strong>{new Date(item.detectedAt).toLocaleString()}</strong></div><div><span>Recovery time</span><strong>{item.recoveryDurationMs === null ? 'Not measured' : `${item.recoveryDurationMs} ms`}</strong></div></div></Panel>

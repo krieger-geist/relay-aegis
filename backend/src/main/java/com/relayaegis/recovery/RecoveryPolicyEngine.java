@@ -80,12 +80,13 @@ public class RecoveryPolicyEngine {
         }
         if (action == RecoveryActionType.QUARANTINE_RECORD) {
             // Data actions never touch Docker or Kubernetes: they call the application's own quarantine hook.
+            String quarantineMode = policies.findById(POLICY_QUARANTINE).map(p -> p.mode).orElse(null);
             if (app.quarantineUrl == null || app.quarantineUrl.isBlank()) {
-                return RecoveryDecision.blocked(action, target, POLICY_QUARANTINE, null, pattern, confidence, reasons,
+                return RecoveryDecision.blocked(action, target, POLICY_QUARANTINE, quarantineMode, pattern, confidence, reasons,
                         "This application has no quarantine hook configured, so RELAY cannot move the record aside. Repair record " + target + " by hand.", false);
             }
             if (automatic) {
-                return RecoveryDecision.blocked(action, target, POLICY_QUARANTINE, null, pattern, confidence, reasons,
+                return RecoveryDecision.blocked(action, target, POLICY_QUARANTINE, quarantineMode, pattern, confidence, reasons,
                         "Quarantining data always needs an operator; use Run recovery to approve.", true);
             }
         } else if (KubernetesTarget.is(target)) {
