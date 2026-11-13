@@ -87,7 +87,8 @@ services:
       timeout: 5s
       retries: 3
 
-  # Docker rollback only (bad deploy -> last good image): read a container and an image, create the replacement,
+  # Docker rollback only (bad deploy -> last good image): read a container and an image, tag the last good image so
+  # Docker keeps it (relay-rollback/<container>:last-good), create the replacement,
   # stop, rename and start containers, and reattach networks. Off by default: start it with `--profile rollback` and
   # set RELAY_DOCKER_ROLLBACK_ENABLED=true. Host bind mounts are refused unless RELAY_ROLLBACK_BIND_MOUNTS_FROM lists
   # the allowed host directories. The backend still only touches containers in RELAY_DOCKER_ALLOWED_CONTAINERS.
@@ -108,7 +109,7 @@ services:
       - -allowbindmountfrom=${RELAY_ROLLBACK_BIND_MOUNTS_FROM:-/relay-rollback-no-bind-mounts}
       - -allowHEAD=(/v1\.[0-9]+)?/_ping
       - -allowGET=((/v1\.[0-9]+)?/(_ping|version|containers/[A-Za-z0-9][A-Za-z0-9_.-]*/json|images/sha256:[0-9a-f]{64}/json))
-      - -allowPOST=(/v1\.[0-9]+/(containers/create|containers/[A-Za-z0-9][A-Za-z0-9_.-]*/(stop|start|rename)|networks/[A-Za-z0-9][A-Za-z0-9_.-]*/connect))
+      - -allowPOST=(/v1\.[0-9]+/(containers/create|containers/[A-Za-z0-9][A-Za-z0-9_.-]*/(stop|start|rename)|networks/[A-Za-z0-9][A-Za-z0-9_.-]*/connect|images/sha256:[0-9a-f]{64}/tag))
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     healthcheck:

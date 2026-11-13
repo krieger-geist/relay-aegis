@@ -96,9 +96,12 @@ application has no database (unit tests only).
 **Done when:** the demo's failures heal on Kubernetes in CI, with measured times.
 
 ### Phase 4: Deeper detection (2–3 weeks)
-**Status: in progress.** Done: synthetic user journey checks, approved data quarantine through the application's own
-hook, "what changed" evidence from container starts, and a latency baseline. Still open: error-rate and SLO burn-rate
-alerts, log anomaly counts, resource trends, and rolling back a bad Docker deploy.
+**Status: done (unreleased).** Synthetic user journey checks; approved data quarantine through the application's own
+hook; "what changed" evidence; latency baseline; error-budget (SLO) burn-rate alerts; log anomaly rates; memory and
+CPU trends; and bad-deploy rollback to the last good image, pinned so Docker keeps it. Both "done when" cases were
+run live in Docker: `corrupt-record` was quarantined after approval, and a broken release was rolled back and verified
+19 s after approval. Not covered: Prometheus queries as a signal source, and config changes (only image changes) in
+"what changed".
 
 - Synthetic transactions (e.g. load the Orders list), which closes today's corrupt-record limit, plus a policy-gated
   data-quarantine repair (move the row aside, never delete, require approval).

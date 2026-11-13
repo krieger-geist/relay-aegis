@@ -157,6 +157,16 @@ paths:
         '400': {description: 'Invalid URL, a journey or hook URL on another host, or a hook without a journey URL'}
         '401': {description: Missing or invalid access token}
         '429': {description: 'Hourly per-account limit reached (ADMIN accounts are not limited); see the Retry-After header'}
+  /api/applications/{id}/slo:
+    get:
+      summary: Availability SLO and error-budget burn
+      description: 'Error and burn rates over 5 min, 1 h, 6 h, 24 h and 30 days from the application''s own checks, the share of the 30-day error budget left, and alert = fast_burn | slow_burn | null.'
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+        '404': {description: Application not found}
   /api/applications/{id}:
     get:
       summary: Application detail

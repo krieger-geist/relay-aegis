@@ -66,6 +66,28 @@ public class DockerRollbackService {
 
     public boolean isEnabled() { return enabled; }
 
+    /** The tag that keeps a container's last good image on the host: {@code relay-rollback/<container>:last-good}. */
+    static String pinRepository(String container) { return "relay-rollback/" + container.toLowerCase(java.util.Locale.ROOT); }
+
+    /**
+     * Tags the last good image so Docker keeps it. Without a tag, an image that no container uses any more can be
+     * deleted as soon as a deploy replaces its container, and there would be nothing to roll back to. Moving the tag
+     * to a newer good image releases the older one. Returns false when rollback is off or the tag could not be set.
+     */
+    public boolean pin(String container, String imageId) {
+        if (!enabled || container == null || !NAME.matcher(container).matches() || imageId == null || !IMAGE_ID.matcher(imageId).matches()) return false;
+        try {
+            Response response = post("/images/" + imageId + "/tag?repo=" + enc(pinRepository(container)) + "&tag=last-good", null);
+            if (response.status() == 201 || response.status() == 200) return true;
+            log.warn("Could not pin the last good image of {}: {}", container, reason(response));
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        } catch (Exception ex) {
+            log.warn("Could not pin the last good image of {}: {}", container, ex.getClass().getSimpleName());
+        }
+        return false;
+    }
+
     /** Thrown for any refused or failed step; the message is safe to show. */
     static final class RollbackException extends RuntimeException {
         RollbackException(String message) { super(message); }

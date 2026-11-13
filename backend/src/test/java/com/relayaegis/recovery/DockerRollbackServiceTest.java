@@ -76,6 +76,8 @@ class DockerRollbackServiceTest {
             reply = status == 500 ? "{\"message\":\"port is already allocated\"}" : "";
         } else if (path.endsWith("/stop") || path.endsWith("/rename")) {
             status = 204;
+        } else if (path.endsWith("/tag")) {
+            status = 201;
         } else if (path.endsWith("/connect")) {
             status = 200;
         } else {
@@ -145,5 +147,15 @@ class DockerRollbackServiceTest {
 
         assertTrue(service(true).rollback("bad name;rm", GOOD, null).detail().contains("Invalid container name"));
         assertTrue(service(true).rollback(NAME, "latest", null).detail().contains("No last good image"));
+    }
+
+    @Test
+    void theLastGoodImageIsPinnedWithItsOwnTagSoDockerKeepsIt() {
+        assertTrue(service(true).pin("Relay-Target", GOOD));
+        assertEquals("POST /images/" + GOOD + "/tag?repo=relay-rollback/relay-target&tag=last-good", calls.get(0));
+        calls.clear();
+        assertFalse(service(false).pin("relay-target", GOOD));
+        assertFalse(service(true).pin("relay-target", "latest"));
+        assertTrue(calls.isEmpty());
     }
 }

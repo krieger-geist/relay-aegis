@@ -51,6 +51,11 @@ public class DeploymentTracker {
     private final ObjectMapper mapper;
     private final int goodAfterChecks;
     private final Map<String, Candidate> candidates = new ConcurrentHashMap<>();
+    private com.relayaegis.recovery.DockerRollbackService rollback;
+    private final java.util.Set<String> pinned = ConcurrentHashMap.newKeySet();
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setRollback(com.relayaegis.recovery.DockerRollbackService rollback) { this.rollback = rollback; }
     private final Map<String, Deque<ResourceSample>> samples = new ConcurrentHashMap<>();
 
     public DeploymentTracker(DockerCommandRunner runner, DockerControlService docker, ApplicationRepository applications, ObjectMapper mapper,
@@ -86,6 +91,12 @@ public class DeploymentTracker {
                 app.lastGoodAt = Instant.now();
                 applications.save(app);
                 log.info("Last good image for {} is now {} ({})", app.id, current.imageRef(), current.imageId().substring(7, 19));
+            }
+            // Pin once per process the image that is (still) the last good one, so a restart of RELAY re-pins it too.
+            if (current.imageId().equals(app.lastGoodImageId) && rollback != null && rollback.isEnabled()
+                    && pinned.add(app.dockerContainer + "@" + current.imageId()) && !rollback.pin(app.dockerContainer, current.imageId())) {
+                pinned.remove(app.dockerContainer + "@" + current.imageId());
+                log.warn("The last good image of {} is not pinned; Docker may delete it after the next deploy", app.dockerContainer);
             }
         } catch (RuntimeException ex) {
             log.debug("Deployment tracking skipped for {}: {}", applicationId, ex.getClass().getSimpleName());
