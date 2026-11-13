@@ -51,6 +51,14 @@ public class MonitoringService {
     private final RelayMetrics metrics;
     /** Serializes checks per application so concurrent manual and scheduled checks cannot open duplicate incidents. */
     private final Map<String, ReentrantLock> applicationLocks = new ConcurrentHashMap<>();
+    private com.relayaegis.runtime.DeploymentTracker deployments;
+    private SloService slo;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setSloService(SloService slo) { this.slo = slo; }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setDeploymentTracker(com.relayaegis.runtime.DeploymentTracker deployments) { this.deployments = deployments; }
 
     public MonitoringService(ApplicationService applications, IncidentService incidentService,
             HealthCheckRepository healthChecks, TargetUrlPolicy targetUrlPolicy, ApplicationEventPublisher events,
@@ -97,6 +105,8 @@ public class MonitoringService {
                     ? probeJourney(targetUrlPolicy.validate(app.journeyUrl), health) : health;
             HealthCheckResult result = transactions.execute(status -> record(applicationId, probe));
             metrics.healthCheck(applicationId, probe.outcome(), probe.elapsedMs());
+            if (deployments != null) deployments.observe(applicationId, MonitoringRules.HEALTHY.equals(probe.outcome()));
+            if (slo != null) slo.evaluate(applications.findEntity(applicationId));
             return result;
         } finally {
             lock.unlock();

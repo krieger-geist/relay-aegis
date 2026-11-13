@@ -49,7 +49,7 @@ public class EvidenceCorrelationEngine {
     static final double CHANGE_TARGET_BOOST = 0.03;
     private static final Set<String> SLOWDOWN_PATTERNS = Set.of("application-timeout", "http-5xx", "dependency-unavailable", "tcp-connect-timeout");
     /** Patterns whose evidence stays valid across a restart (restart history, OOM flag, dependency state). */
-    private static final Set<String> PROCESS_INDEPENDENT = Set.of("crash-loop", "oom-killed", "dependency-unavailable", "dependency-recovered");
+    private static final Set<String> PROCESS_INDEPENDENT = Set.of("crash-loop", "oom-killed", "dependency-unavailable", "dependency-recovered", "bad-deploy");
     private static final Set<String> CODE_CATEGORIES = Set.of("reliability", "security", "error-handling", "database-safety",
             "correctness", "configuration", "process-execution", "secret-hygiene");
     private static final Map<String, Integer> SEVERITY_RANK = Map.of("critical", 0, "high", 1, "medium", 2, "low", 3, "info", 4);
@@ -64,6 +64,18 @@ public class EvidenceCorrelationEngine {
     private final TargetUrlPolicy targetUrlPolicy;
     private final AssessmentRepository assessments;
     private final ObjectMapper mapper;
+    private com.relayaegis.runtime.DeploymentTracker deployments;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setDeploymentTracker(com.relayaegis.runtime.DeploymentTracker deployments) { this.deployments = deployments; }
+
+    /** Error lines per minute after the failure began must reach this multiple of the rate before it (and at least 1/min). */
+    static final double LOG_ANOMALY_FACTOR = 5.0;
+    /** Memory at or above this percent of its limit, and still climbing, is a resource exhaustion trend. */
+    static final double MEMORY_TREND_PERCENT = 80.0;
+    private static final Set<String> LOG_SENSITIVE = Set.of("http-5xx", "user-journey-failure", "bad-deploy", "crash-loop", "container-crashed",
+            "application-timeout", "unclassified-failure");
+    private static final Set<String> RESOURCE_SENSITIVE = Set.of("oom-killed", "crash-loop", "container-crashed", "application-timeout", "http-5xx");
 
     public EvidenceCorrelationEngine(ApplicationRepository applications, HealthCheckRepository healthChecks,
             IncidentRepository incidentRepository, IncidentService incidents, RuntimeInspector inspector,
@@ -111,12 +123,23 @@ public class EvidenceCorrelationEngine {
         NetworkObservation network = failing && app != null ? probe(app.url, unavailable) : null;
         List<CodeSignal> code = codeSignals(app, unavailable);
         History history = history(incident);
+        DiagnosticContext.DeployObservation deployment = null;
+        List<com.relayaegis.runtime.DeploymentTracker.ResourceSample> resources = List.of();
+        if (deployments != null && container != null && app != null) {
+            var current = deployments.current(container).orElse(null);
+            if (current != null) {
+                deployment = new DiagnosticContext.DeployObservation(container, current.imageId(), current.imageRef(), current.createdAt(),
+                        app.lastGoodImageId, app.lastGoodImageRef, app.lastGoodAt);
+                if (app.lastGoodImageId == null) unavailable.add("Deploy history: no image has passed enough consecutive health checks yet to be the last good image");
+            }
+            resources = deployments.samples(container);
+        }
         LatencyBaseline latency = LatencyBaseline.from(healthChecks.findTop100ByApplicationIdOrderByCheckedAtDesc(incident.applicationId));
         if (latency == null) unavailable.add("Latency baseline: fewer than " + LatencyBaseline.MIN_SAMPLES + " healthy checks recorded for this application");
 
         return new DiagnosticContext(incident.id, incident.component, incident.detectedAt, incident.applicationId,
                 app == null ? null : app.url, app == null ? null : app.environment, container, List.copyOf(checks),
-                List.copyOf(evidence), runtime, logs, List.copyOf(dependencies), network, code, history, List.copyOf(unavailable), latency);
+                List.copyOf(evidence), runtime, logs, List.copyOf(dependencies), network, code, history, List.copyOf(unavailable), latency, deployment, resources);
     }
 
     /**
@@ -127,6 +150,8 @@ public class EvidenceCorrelationEngine {
     public List<DiagnosticFinding> correlate(List<DiagnosticFinding> findings, DiagnosticContext context) {
         List<DiagnosticFinding> out = new ArrayList<>();
         List<Change> changes = recentChanges(context);
+        EvidenceRef logAnomaly = logAnomaly(context);
+        EvidenceRef resourceTrend = resourceTrend(context);
         for (DiagnosticFinding finding : findings) {
             DiagnosticFinding next = finding;
             long independent = next.sources().stream().filter(s -> !s.equals("code") && !s.equals("history")).count();
@@ -149,6 +174,8 @@ public class EvidenceCorrelationEngine {
                     // Context for every failure; a little extra weight when the finding acts on the container that changed.
                     next = next.plusSupport(change.ref(), change.container().equals(next.actionTarget()) ? CHANGE_TARGET_BOOST : 0);
                 }
+                if (logAnomaly != null) next = next.plusSupport(logAnomaly, LOG_SENSITIVE.contains(next.patternId()) ? 0.02 : 0);
+                if (resourceTrend != null) next = next.plusSupport(resourceTrend, RESOURCE_SENSITIVE.contains(next.patternId()) ? CHANGE_TARGET_BOOST : 0);
                 if (context.latency() != null) {
                     // Slowing down before failing points at saturation (pool, threads, a slow dependency), not a sudden crash.
                     boolean slowdownMatters = context.latency().slowBeforeFailure() && SLOWDOWN_PATTERNS.contains(next.patternId());
@@ -161,6 +188,62 @@ public class EvidenceCorrelationEngine {
             out.add(next);
         }
         return out;
+    }
+
+    /**
+     * Error-like log lines per minute after the failure began, against the rate in the same log tail before it. Reported
+     * only when the rate rose at least {@link #LOG_ANOMALY_FACTOR} times and to at least one line a minute.
+     */
+    static EvidenceRef logAnomaly(DiagnosticContext context) {
+        var logs = context.logs();
+        HealthCheckEntity first = context.firstFailure().orElse(null);
+        if (logs == null || logs.rate() == null || first == null || first.checkedAt == null) return null;
+        var rate = logs.rate();
+        if (rate.from() == null || rate.to() == null || !rate.from().isBefore(first.checkedAt)) return null;
+        double beforeMin = Math.max(1, Duration.between(rate.from(), first.checkedAt).toSeconds()) / 60.0;
+        double afterMin = Math.max(60, Duration.between(first.checkedAt, rate.to()).toSeconds()) / 60.0;
+        long before = rate.errorsBetween(rate.from(), first.checkedAt);
+        long after = rate.errorsBetween(first.checkedAt, rate.to().plusSeconds(1));
+        double beforeRate = before / beforeMin, afterRate = after / afterMin;
+        if (after < 3 || afterRate < 1.0 || afterRate < LOG_ANOMALY_FACTOR * Math.max(beforeRate, 0.05)) return null;
+        return new EvidenceRef("LOGRATE-" + logs.container(), "logs", String.format(Locale.ROOT,
+                "Log anomaly: %d error lines in the %.0f min since the failure began (%.1f/min), against %d in the %.0f min before (%.2f/min).",
+                after, afterMin, afterRate, before, beforeMin, beforeRate));
+    }
+
+    /**
+     * Memory climbing towards the container's limit across the samples taken with each health check (least-squares
+     * slope over the last 30 minutes), or CPU pinned near 100% in the last five samples.
+     */
+    static EvidenceRef resourceTrend(DiagnosticContext context) {
+        var samples = context.resources();
+        if (samples == null || samples.size() < 4 || context.appContainer() == null) return null;
+        Instant end = samples.get(samples.size() - 1).at();
+        List<com.relayaegis.runtime.DeploymentTracker.ResourceSample> recent = samples.stream()
+                .filter(s -> s.at() != null && !s.at().isBefore(end.minus(Duration.ofMinutes(30))) && s.memoryPercent() != null).toList();
+        if (recent.size() >= 4) {
+            double n = recent.size(), sx = 0, sy = 0, sxx = 0, sxy = 0;
+            Instant t0 = recent.get(0).at();
+            for (var s : recent) {
+                double x = Duration.between(t0, s.at()).toSeconds() / 60.0, y = s.memoryPercent();
+                sx += x; sy += y; sxx += x * x; sxy += x * y;
+            }
+            double denominator = n * sxx - sx * sx;
+            double slope = denominator == 0 ? 0 : (n * sxy - sx * sy) / denominator;
+            double last = recent.get(recent.size() - 1).memoryPercent(), firstValue = recent.get(0).memoryPercent();
+            if (last >= MEMORY_TREND_PERCENT && slope > 0.5) {
+                double minutes = Duration.between(t0, end).toSeconds() / 60.0;
+                return new EvidenceRef("RES-" + context.appContainer(), "runtime", String.format(Locale.ROOT,
+                        "Resource trend: memory rose from %.0f%% to %.0f%% of the limit over %.0f min (+%.1f%%/min); at this rate it reaches the limit in about %.0f min.",
+                        firstValue, last, minutes, slope, Math.max(0, (100 - last) / slope)));
+            }
+        }
+        List<com.relayaegis.runtime.DeploymentTracker.ResourceSample> lastFive = samples.subList(Math.max(0, samples.size() - 5), samples.size());
+        if (lastFive.size() == 5 && lastFive.stream().allMatch(s -> s.cpuPercent() != null && s.cpuPercent() >= 90)) {
+            return new EvidenceRef("RES-" + context.appContainer(), "runtime",
+                    "Resource trend: CPU at 90% or more in each of the last 5 samples (one per health check); the application is CPU-bound.");
+        }
+        return null;
     }
 
     /** One container that (re)started shortly before the failure began, cited as "what changed". */

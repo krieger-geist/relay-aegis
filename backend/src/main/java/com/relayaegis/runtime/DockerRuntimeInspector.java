@@ -136,10 +136,19 @@ public class DockerRuntimeInspector implements RuntimeInspector {
 
     public static LogExcerpt parseLogs(String container, String raw) {
         List<String> all = new ArrayList<>();
+        List<Instant> errorTimes = new ArrayList<>();
+        Instant from = null, to = null;
         for (String line : raw.split("\\r?\\n")) {
             if (line.isBlank()) continue;
+            Instant at = lineTime(line);
+            if (at != null) {
+                if (from == null) from = at;
+                to = at;
+                if (FATAL.matcher(line).find() || EXCEPTION.matcher(line).find() || TIMEOUT.matcher(line).find() || REFUSED.matcher(line).find()) errorTimes.add(at);
+            }
             all.add(EvidenceSanitizer.clean(TIMESTAMP_PREFIX.matcher(line).replaceFirst(""), 300));
         }
+        LogExcerpt.LogRate rate = from == null ? null : new LogExcerpt.LogRate(from, to, all.size(), List.copyOf(errorTimes));
         List<String> kept = all.subList(Math.max(0, all.size() - MAX_STORED_LINES), all.size());
         List<LogExcerpt.LogSignal> signals = new ArrayList<>();
         for (int i = 0; i < kept.size(); i++) {
@@ -155,7 +164,12 @@ public class DockerRuntimeInspector implements RuntimeInspector {
             Matcher listening = LISTENING.matcher(line);
             if (listening.find()) signals.add(new LogExcerpt.LogSignal(LogExcerpt.LogSignal.Kind.LISTENING, i, line, listening.group(1)));
         }
-        return new LogExcerpt(container, true, null, List.copyOf(kept), List.copyOf(signals));
+        return new LogExcerpt(container, true, null, List.copyOf(kept), List.copyOf(signals), rate);
+    }
+
+    private static Instant lineTime(String line) {
+        Matcher m = TIMESTAMP_PREFIX.matcher(line);
+        return m.find() ? instant(m.group().trim()) : null;
     }
 
     private static String target(String line) {

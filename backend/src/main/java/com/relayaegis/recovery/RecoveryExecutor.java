@@ -21,6 +21,10 @@ public class RecoveryExecutor {
     private final RuntimeInspector inspector;
     private final KubernetesControlService kubernetes;
     private DataQuarantineClient quarantine;
+    private DockerRollbackService rollback;
+
+    @Autowired(required = false)
+    void setRollback(DockerRollbackService rollback) { this.rollback = rollback; }
 
     @Autowired(required = false)
     void setQuarantineClient(DataQuarantineClient quarantine) { this.quarantine = quarantine; }
@@ -46,6 +50,10 @@ public class RecoveryExecutor {
             if (quarantine == null) return new ExecutionResult(false, false, "Data quarantine is not available in this build.");
             return quarantine.quarantine(app.quarantineUrl, decision.target(), incidentId);
         }
+        if (decision.authorized() && decision.action() == RecoveryActionType.ROLLBACK_IMAGE) {
+            if (rollback == null) return new ExecutionResult(false, false, "Docker rollback is not available in this build.");
+            return rollback.rollback(decision.target(), app.lastGoodImageId, app.lastGoodImageRef);
+        }
         return execute(decision, app.dockerContainer);
     }
 
@@ -55,8 +63,8 @@ public class RecoveryExecutor {
             return new ExecutionResult(false, true, "Not executed: " + (decision.blockedReason() == null ? "action is not authorized." : decision.blockedReason()));
         }
         String target = decision.target();
-        if (decision.action() == RecoveryActionType.QUARANTINE_RECORD) {
-            return new ExecutionResult(false, false, "QUARANTINE_RECORD needs the application's quarantine hook; nothing was run.");
+        if (decision.action() == RecoveryActionType.QUARANTINE_RECORD || decision.action() == RecoveryActionType.ROLLBACK_IMAGE) {
+            return new ExecutionResult(false, false, decision.action() + " needs the application's details; nothing was run.");
         }
         if (KubernetesTarget.is(target)) return executeOnKubernetes(decision.action(), target);
         if (decision.action() == RecoveryActionType.ROLLOUT_UNDO || decision.action() == RecoveryActionType.SCALE_WORKLOAD || decision.action() == RecoveryActionType.DELETE_POD) {

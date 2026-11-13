@@ -25,6 +25,8 @@ public enum RecoveryActionType {
     DELETE_POD,
     /** Move one bad data record aside through the application's own quarantine hook. Never a delete; never automatic. */
     QUARANTINE_RECORD,
+    /** Docker: recreate the container on its last good image after a bad deploy (separate policy; failed container kept). */
+    ROLLBACK_IMAGE,
     /** No safe automatic action: collect more evidence (logs, configuration) before acting. */
     INVESTIGATE,
     /** A restart would not help or is unsafe (crash loop, configuration error, external failure): needs a human. */
@@ -32,6 +34,6 @@ public enum RecoveryActionType {
 
     public boolean mutates() {
         return this == START_CONTAINER || this == RESTART_CONTAINER || this == RESTART_DEPENDENCY || this == RECONNECT_NETWORK
-                || this == ROLLOUT_UNDO || this == SCALE_WORKLOAD || this == DELETE_POD || this == QUARANTINE_RECORD;
+                || this == ROLLOUT_UNDO || this == SCALE_WORKLOAD || this == DELETE_POD || this == QUARANTINE_RECORD || this == ROLLBACK_IMAGE;
     }
 }

@@ -46,6 +46,9 @@ public class RecoveryPolicyService {
      */
     public void seedDefaultsIfEmpty() {
         seedKubernetes();
+        if (!policies.existsById("policy-docker-rollback")) {
+            save("policy-docker-rollback", "Roll back a bad Docker deploy", "Recreate an allowlisted container on the last image that passed several consecutive health checks, when the deterministic diagnosis finds the failure started right after a new image was deployed. The failing container is kept, stopped, for inspection.", "require_approval", "high", "Allowlisted containers, with the rollback proxy enabled (opt-in)");
+        }
         if (!policies.existsById("policy-data-quarantine")) {
             save("policy-data-quarantine", "Quarantine a bad data record", "Move one record that breaks the user journey aside through the application's own quarantine hook. Nothing is deleted, and it always needs an operator.", "require_approval", "medium", "Applications with a quarantine hook configured (never automatic)");
         }

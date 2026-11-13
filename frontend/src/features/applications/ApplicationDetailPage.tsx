@@ -10,7 +10,7 @@ import { StatusBadge } from '@/components/status/StatusBadge';
 import { ProvenanceTag } from '@/components/status/ProvenanceTag';
 import { EmptyState, ErrorState, LoadingState } from '@/components/feedback/States';
 import { apiGet, apiPost } from '@/lib/api/client';
-import type { Application, HealthSample, Incident, RecoveryEvent, RecoveryPolicy, SystemRuntime } from '@/types/domain';
+import type { Application, HealthSample, Incident, RecoveryEvent, RecoveryPolicy, SloStatus, SystemRuntime } from '@/types/domain';
 import { SystemHealthStrip, SystemIncidentPanel } from './SystemSelfHealing';
 import { latestIncident } from './systemIncidents';
 
@@ -24,6 +24,7 @@ export function ApplicationDetailPage() {
   const queryClient = useQueryClient();
   const application = useQuery({ queryKey: ['application', id], queryFn: () => apiGet<Application>(`/api/applications/${id}`), enabled: Boolean(id), refetchInterval: 30000, retry: false });
   const runtime = useQuery({ queryKey: ['system-runtime', id], queryFn: () => apiGet<SystemRuntime>(`/api/applications/${id}/runtime`), enabled: Boolean(id), refetchInterval: 10000, retry: false });
+  const slo = useQuery({ queryKey: ['application-slo', id], queryFn: () => apiGet<SloStatus>(`/api/applications/${id}/slo`), enabled: Boolean(id), refetchInterval: 30000, retry: false });
   const healthHistory = useQuery({ queryKey: ['application-health-history', id], queryFn: () => apiGet<HealthSample[]>(`/api/applications/${id}/checks/history`), enabled: Boolean(id), refetchInterval: 30000, retry: false });
   const incidents = useQuery({ queryKey: ['incidents'], queryFn: () => apiGet<Incident[]>('/api/incidents'), retry: false,
     refetchInterval: (query) => { const current = latestIncident(query.state.data?.data ?? [], id); return current && ['action_taken', 'verifying'].includes(current.state) ? 2000 : current && current.state !== 'recovered' ? 5000 : 15000; } });
@@ -55,6 +56,7 @@ export function ApplicationDetailPage() {
       <div className="metric-grid compact-metrics">
         <div className="panel compact-stat"><div className="compact-label">Latest response</div><div className="compact-value">{app.responseMs === null ? '—' : `${app.responseMs} ms`}</div><div className="compact-foot">Latest recorded live check</div><ProvenanceTag provenance={app.lastChecked ? app.provenance : 'unavailable'} /></div>
         <div className="panel compact-stat"><div className="compact-label">Recorded failure rate</div><div className="compact-value">{app.errorRate === null ? '—' : `${app.errorRate.toFixed(1)}%`}</div><div className="compact-foot">Observed checks in rolling 24-hour window</div><ProvenanceTag provenance={app.lastChecked ? app.provenance : 'unavailable'} /></div>
+        <SloStat slo={slo.data?.data} provenance={slo.data?.provenance} />
         <div className="panel compact-stat"><div className="compact-label">Recent samples</div><div className="compact-value">{samples.length}</div><div className="compact-foot">Persisted health check records</div><ProvenanceTag provenance={healthHistory.data?.provenance ?? 'unavailable'} /></div>
         <div className="panel compact-stat"><div className="compact-label">Failed samples</div><div className="compact-value">{totalFailed}</div><div className="compact-foot">Failed checks in the returned history</div><ProvenanceTag provenance={healthHistory.data?.provenance ?? 'unavailable'} /></div>
       </div>
@@ -80,4 +82,18 @@ export function ApplicationDetailPage() {
     {tab === 'Recoveries' ? <Panel title="Related recovery events" subtitle="Only persisted recovery outcomes are displayed" provenance={history.data?.provenance}>{history.isLoading ? <LoadingState /> : history.isError ? <ErrorState onRetry={() => void history.refetch()} /> : relatedRecoveries.length ? <div className="table-scroll"><table className="app-table"><thead><tr><th>Event</th><th>Outcome</th><th>Time</th></tr></thead><tbody>{relatedRecoveries.map((event) => <tr key={event.id}><td>{event.event}<div className="app-meta">{event.detail}</div></td><td><StatusBadge status={event.outcome} /></td><td>{new Date(event.timestamp).toLocaleString()}</td></tr>)}</tbody></table></div> : <EmptyState title="No recovery events" detail="Recovery events appear after an authorized recovery attempt is recorded." />}</Panel> : null}
     {tab === 'Policies' ? <Panel title="Recovery policy" subtitle="Policy restrictions are enforced by the backend" provenance={policies.data?.provenance}>{policies.isLoading ? <LoadingState /> : policies.isError ? <ErrorState onRetry={() => void policies.refetch()} /> : <div className="policy-list">{(policies.data?.data ?? []).map((policy) => <div className="policy-row" key={policy.id}><div><div className="policy-name">{policy.action}</div><div className="policy-desc">{policy.description}</div><div className="app-meta">Scope: {policy.scope}</div></div><span className="plain-state">{policyModeLabel[policy.mode]}</span><span className={`risk-tag ${policy.risk}`}>{policy.risk} risk</span></div>)}<Link className="btn btn-sm" to="/settings">Manage policies</Link></div>}</Panel> : null}
   </>;
+}
+
+/** Error budget left over 30 days, the 1 h burn rate, and a burn alert when one is firing. */
+function SloStat({ slo, provenance }: { slo?: SloStatus; provenance?: string }) {
+  const hour = slo?.windows.find((w) => w.name === '1h');
+  const remaining = slo?.budgetRemaining;
+  const value = remaining === null || remaining === undefined ? '—' : `${Math.round(Math.max(-9.99, remaining) * 100)}%`;
+  const alert = slo?.alert === 'fast_burn' ? 'Burning fast' : slo?.alert === 'slow_burn' ? 'Burning steadily' : null;
+  return <div className="panel compact-stat">
+    <div className="compact-label">Error budget left (30 d)</div>
+    <div className="compact-value">{value}{alert ? <span className="status-badge" style={{ marginLeft: 8, fontSize: 11, color: 'var(--status-recovery-failed-fg)', background: 'var(--status-recovery-failed-bg)', borderColor: 'var(--status-recovery-failed-border)' }}>{alert}</span> : null}</div>
+    <div className="compact-foot">{slo ? `SLO ${(slo.target * 100).toFixed(1)}% · 1 h burn ${hour?.burnRate === null || hour?.burnRate === undefined ? '—' : `${hour.burnRate.toFixed(1)}x`}` : 'Availability SLO from recorded checks'}</div>
+    <ProvenanceTag provenance={(provenance ?? 'unavailable') as Application['provenance']} />
+  </div>;
 }

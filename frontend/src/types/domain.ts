@@ -488,3 +488,21 @@ export interface AssessmentDiagnosis {
   sources: string[];
   aiHypothesis: string | null;
 }
+
+/** One error-budget window: error rate and burn rate (error rate divided by the error budget, 1 - target). */
+export interface SloWindow {
+  name: string;
+  checks: number;
+  failures: number;
+  errorRate: number | null;
+  burnRate: number | null;
+}
+
+/** Availability SLO status from the application's own checks. alert: 'fast_burn' | 'slow_burn' | null. */
+export interface SloStatus {
+  applicationId: string;
+  target: number;
+  windows: SloWindow[];
+  budgetRemaining: number | null;
+  alert: 'fast_burn' | 'slow_burn' | null;
+}

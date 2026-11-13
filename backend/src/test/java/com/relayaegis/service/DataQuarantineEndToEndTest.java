@@ -110,6 +110,7 @@ class DataQuarantineEndToEndTest {
         monitoring.check(appId);
         IncidentEntity incident = awaitIncident(appId);
         await(() -> reload(incident).diagnosisJson != null, 10_000);
+        await(() -> reload(incident).evidenceJson.contains("Automatic recovery policy decision"), 10_000);
 
         DiagnosisDto diagnosis = mapper.readValue(reload(incident).diagnosisJson, DiagnosisDto.class);
         assertEquals("user-journey-failure", diagnosis.engine().topPatternId());
@@ -138,6 +139,7 @@ class DataQuarantineEndToEndTest {
         monitoring.check(appId);
         IncidentEntity incident = awaitIncident(appId);
         await(() -> reload(incident).diagnosisJson != null, 10_000);
+        await(() -> reload(incident).evidenceJson.contains("Automatic recovery policy decision"), 10_000);
         ResponseStatusException refused = assertThrows(ResponseStatusException.class, () -> recovery.beginRecovery(incident.id));
         assertTrue(refused.getReason().contains("no quarantine hook"), refused.getReason());
         assertTrue(quarantineCalls.isEmpty());

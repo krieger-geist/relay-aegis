@@ -4,6 +4,10 @@ const http = require('node:http');
 const { randomUUID } = require('node:crypto');
 const port = Number(process.env.PORT || 3000);
 const startedAt = Date.now();
+// Bad-deploy demo: an image built with --build-arg RELEASE=bad is a broken release. Its /health fails from the start,
+// a restart does not fix it, and rolling back to the previous image does.
+let release = 'good';
+try { release = require('node:fs').readFileSync(require('node:path').join(__dirname, 'RELEASE'), 'utf8').trim() || 'good'; } catch { /* no file: good */ }
 // Simulated failure for runbook demos: POST /chaos/pool-exhausted makes every later request fail the way an
 // application with a leaked database connection pool does, until the process restarts.
 let poolExhausted = false;
@@ -103,9 +107,15 @@ const server = http.createServer((req, res) => {
     }).catch(() => { res.writeHead(400); res.end(JSON.stringify({ error: 'Send JSON {"recordId": "..."}' })); });
     return;
   }
+  if ((url.pathname === '/health' || url.pathname === '/actuator/health') && release === 'bad') {
+    console.error('Error: release "bad" requires ORDERS_DB_URL, which is not set; refusing traffic');
+    res.writeHead(503);
+    res.end(JSON.stringify({ status: 'DOWN', release, error: 'Missing required configuration ORDERS_DB_URL' }));
+    return;
+  }
   if (url.pathname === '/health' || url.pathname === '/actuator/health') {
     res.writeHead(200);
-    res.end(JSON.stringify({ status: 'UP', service: 'relay-aegis-test-target', requestId: randomUUID(), uptimeSeconds: Math.floor((Date.now() - startedAt) / 1000) }));
+    res.end(JSON.stringify({ status: 'UP', service: 'relay-aegis-test-target', release, requestId: randomUUID(), uptimeSeconds: Math.floor((Date.now() - startedAt) / 1000) }));
     return;
   }
   if (url.pathname === '/') {

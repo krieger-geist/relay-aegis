@@ -30,11 +30,16 @@ public class RecoveryPolicyEngine {
     public static final String POLICY_SCALE = "policy-kubernetes-scale";
     public static final String POLICY_DELETE_POD = "policy-kubernetes-delete-pod";
     public static final String POLICY_QUARANTINE = "policy-data-quarantine";
+    public static final String POLICY_DOCKER_ROLLBACK = "policy-docker-rollback";
 
     private final RecoveryPolicyRepository policies;
     private final DockerControlService docker;
     private final RecoveryGuard guard;
     private final KubernetesControlService kubernetes;
+    private DockerRollbackService rollback;
+
+    @Autowired(required = false)
+    void setRollback(DockerRollbackService rollback) { this.rollback = rollback; }
 
     public RecoveryPolicyEngine(RecoveryPolicyRepository policies, DockerControlService docker, RecoveryGuard guard) {
         this(policies, docker, guard, KubernetesControlService.disabled());
@@ -105,6 +110,14 @@ public class RecoveryPolicyEngine {
                 return RecoveryDecision.blocked(action, target, null, null, pattern, confidence, reasons,
                         "Container " + target + " is not in the recovery allowlist (RELAY_DOCKER_ALLOWED_CONTAINERS).", false);
             }
+            if (action == RecoveryActionType.ROLLBACK_IMAGE && (rollback == null || !rollback.isEnabled())) {
+                return RecoveryDecision.blocked(action, target, POLICY_DOCKER_ROLLBACK, null, pattern, confidence, reasons,
+                        "Docker rollback is disabled by configuration (RELAY_DOCKER_ROLLBACK_ENABLED). Roll back " + target + " by redeploying the previous release.", false);
+            }
+            if (action == RecoveryActionType.ROLLBACK_IMAGE && (app.lastGoodImageId == null || app.lastGoodImageId.isBlank())) {
+                return RecoveryDecision.blocked(action, target, POLICY_DOCKER_ROLLBACK, null, pattern, confidence, reasons,
+                        "No last good image is recorded for this application yet, so there is nothing safe to roll back to.", false);
+            }
         }
         String policyId = switch (action) {
             case RESTART_DEPENDENCY -> POLICY_DEPENDENCY;
@@ -113,6 +126,7 @@ public class RecoveryPolicyEngine {
             case SCALE_WORKLOAD -> POLICY_SCALE;
             case DELETE_POD -> POLICY_DELETE_POD;
             case QUARANTINE_RECORD -> POLICY_QUARANTINE;
+            case ROLLBACK_IMAGE -> POLICY_DOCKER_ROLLBACK;
             default -> POLICY_RESTART;
         };
         RecoveryPolicyEntity policy = policies.findById(policyId).orElse(null);
