@@ -257,6 +257,20 @@ failure table, before-and-after numbers, known limits) is the
 
 AI use is declared in the [AI Use Declaration](RELAY_AEGIS_AI_Use_Declaration.pdf).
 
+### Proof: reports, scorecard, nightly chaos (v1.5.0)
+
+- **Post-incident report.** Every incident has a **Report** button: a blameless write-up built only from what RELAY
+  stored (timeline, root cause and confidence, each action and who or which policy started it, verification,
+  evidence, follow-ups such as "this recurred 3 times in 30 days"). Print it to PDF or download Markdown.
+- **Scorecard.** Median and p90 time to detect and to recover per failure type, the verified share, and how many
+  actions ran without fixing anything (target zero). Durations RELAY did not measure are left out, never guessed.
+- **Nightly chaos.** CI breaks a real Kubernetes Deployment on kind five ways every night, measures from outside
+  RELAY, and publishes the trend to the `chaos-results` branch (`TREND.md`).
+- **On-call and audit.** PagerDuty (Events API v2): one page per incident, resolved automatically when RELAY verifies
+  the recovery. Admins can export the full audit trail as CSV or JSON from Settings.
+- **Vulnerable dependencies.** Codebase investigations look pinned npm and pip versions up in OSV and offer a
+  one-line fix to the lowest fixed version; the sandbox re-checks OSV before the fix counts.
+
 ---
 
 ## Tests

@@ -50,6 +50,15 @@ public class GitHubRepositoryAnalyzer {
         this.policy = policy;
     }
 
+    private OsvAdvisoryClient advisories;
+
+    /** Optional: without it (tests, or lookups turned off) the advisory check is reported as not run. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setAdvisories(OsvAdvisoryClient advisories) { this.advisories = advisories; }
+
+    public static final String VULNERABLE_DEPENDENCY = "vulnerable-dependency";
+    public static final String VULNERABLE_DEPENDENCY_TITLE = "Dependency with a known vulnerability";
+
     public AssessmentScanResult scan(String repositoryUrl) throws Exception {
         String normalized = policy.validateAndNormalize(repositoryUrl);
         Path work = Files.createTempDirectory("relay-assessment-");
@@ -132,6 +141,7 @@ public class GitHubRepositoryAnalyzer {
                         CodeAnalysisRules.ManifestInsight insight = CodeAnalysisRules.manifest(relativePath, lowerPath, content);
                         stats.frameworks.addAll(insight.frameworks());
                         stats.directDependencies += insight.dependencies();
+                        stats.pinned.addAll(DependencyVersions.parse(relativePath, content));
                         if (!insight.unpinned().isEmpty() && findings.size() < MAX_FINDINGS) {
                             add(findings, "dependency-management", "Unpinned dependency versions", "low", "high", relativePath, 1,
                                     insight.unpinned().size() + " dependency declaration(s) use no version, a wildcard or a floating 'latest' version: "
@@ -153,6 +163,7 @@ public class GitHubRepositoryAnalyzer {
             }
         });
 
+        String advisoryCheck = advisoryFindings(stats.pinned, findings);
         List<AssessmentFindingDto> uniqueFindings = dedupe(findings);
         List<AssessmentCheckDto> checks = new ArrayList<>();
         checks.add(new AssessmentCheckDto("Repository checkout", "passed", "Fetched one shallow commit from GitHub. Commit: " + commit.substring(0, Math.min(12, commit.length())) + "."));
@@ -166,7 +177,7 @@ public class GitHubRepositoryAnalyzer {
                 : "Detected from manifests: " + abbreviate(String.join(", ", stats.frameworks), 240) + "."));
         checks.add(new AssessmentCheckDto("Static source scan", uniqueFindings.isEmpty() ? "passed" : "warning", "Scanned " + stats.textFiles + " text/source files using built-in security, reliability, correctness and configuration rules. Findings are candidates, not confirmed defects."));
         checks.add(new AssessmentCheckDto("Dependency manifests", stats.manifests.isEmpty() ? "warning" : "passed", stats.manifests.isEmpty() ? "No common dependency manifest was detected." : "Detected " + stats.manifests.size() + " manifest(s): " + abbreviate(String.join(", ", stats.manifests), 260) + "; " + stats.directDependencies + " direct dependency declaration(s)."));
-        checks.add(new AssessmentCheckDto("Dependency vulnerability advisories", "not_run", "No advisory database is queried by this read-only scanner; run an advisory tool (e.g. npm audit, pip-audit, OWASP dependency-check) in a sandbox."));
+        checks.add(new AssessmentCheckDto("Dependency vulnerability advisories", advisoryCheck.substring(0, advisoryCheck.indexOf('|')), advisoryCheck.substring(advisoryCheck.indexOf('|') + 1)));
         checks.add(new AssessmentCheckDto("Test-suite presence", stats.testFiles > 0 ? "passed" : "warning", stats.testFiles > 0 ? "Found " + stats.testFiles + " test-like file/path(s). Tests were not executed." : "No common test-like file/path was detected. This heuristic may miss project-specific test conventions."));
         checks.add(new AssessmentCheckDto("Execution safety", "passed", "Build scripts, package scripts, tests, Dockerfiles, and application code were not executed. Run approved tests in a disposable sandbox after review."));
         if (stats.truncated) checks.add(new AssessmentCheckDto("Scan limits", "warning", "Scan stopped at the configured file/size limit; findings may be incomplete."));
@@ -305,7 +316,36 @@ public class GitHubRepositoryAnalyzer {
         private final Set<String> frameworks = new java.util.LinkedHashSet<>();
         private long linesOfCode;
         private int directDependencies;
+        private final List<DependencyVersions.Dependency> pinned = new ArrayList<>();
     }
+
+    /** Adds one finding per vulnerable pinned dependency; returns "status|detail" for the advisory check. */
+    private String advisoryFindings(List<DependencyVersions.Dependency> pinned, List<AssessmentFindingDto> findings) {
+        if (pinned.isEmpty()) return "not_run|No version-pinned npm (package.json) or pip (requirements.txt) dependency was found to look up.";
+        if (advisories == null || !advisories.enabled()) return "not_run|Advisory lookups are turned off; " + pinned.size() + " pinned dependency version(s) were not checked.";
+        OsvAdvisoryClient.Lookup lookup = advisories.lookup(pinned);
+        if (lookup.error() != null) return "not_run|" + lookup.error();
+        for (OsvAdvisoryClient.Advisory a : lookup.advisories()) {
+            if (findings.size() >= MAX_FINDINGS) break;
+            DependencyVersions.Dependency d = a.dependency();
+            String more = a.advisoryCount() > 1 ? " (and " + (a.advisoryCount() - 1) + " more)" : "";
+            add(findings, VULNERABLE_DEPENDENCY, VULNERABLE_DEPENDENCY_TITLE, a.severity(), "high", d.file(), d.line(),
+                    advisoryEvidence(d, a.id() + more, a.summary(), a.fixedVersion()),
+                    "OSV (osv.dev) lists this exact version as affected. The advisory applies to the declared version; whether the vulnerable code path is reachable was not analysed.",
+                    a.fixedVersion() == null ? "No fixed version is published yet. Consider an alternative package or mitigate per the advisory."
+                            : "Upgrade " + d.name() + " to " + a.fixedVersion() + " or later, then run the tests.");
+        }
+        return (lookup.advisories().isEmpty() ? "passed|" : "warning|") + "Looked up " + lookup.queried() + " pinned dependency version(s) in OSV (osv.dev); "
+                + lookup.advisories().size() + " have known vulnerabilities. Only names and versions were sent.";
+    }
+
+    /** Machine-readable as well as human-readable: the bump strategy parses it back with {@link #ADVISORY_EVIDENCE}. */
+    static String advisoryEvidence(DependencyVersions.Dependency d, String ids, String summary, String fixed) {
+        return d.ecosystem() + " package " + d.name() + " " + d.version() + " is affected by " + ids + ": " + summary.replaceAll("\\s+", " ")
+                + (fixed == null ? " No fixed version is published." : " Fixed in " + fixed + ".");
+    }
+
+    public static final Pattern ADVISORY_EVIDENCE = Pattern.compile("^(npm|PyPI) package (\\S+) (\\S+) is affected by .* Fixed in (\\S+)\\.$", Pattern.DOTALL);
 
     /** Drops repeated findings for the same rule (title) on the same file and line. */
     static List<AssessmentFindingDto> dedupe(List<AssessmentFindingDto> findings) {

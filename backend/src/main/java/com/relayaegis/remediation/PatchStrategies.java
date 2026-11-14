@@ -20,6 +20,10 @@ public final class PatchStrategies {
         String label();
         boolean supports(AssessmentFindingDto finding);
         Result propose(String path, List<String> lines, int lineNumber) throws RemediationException;
+        /** Strategies that need the finding's own data (such as the fixed version) override this one. */
+        default Result propose(AssessmentFindingDto finding, String path, List<String> lines, int lineNumber) throws RemediationException {
+            return propose(path, lines, lineNumber);
+        }
         /** Upper bound on changed lines (additions + removals) a proposal of this strategy may contain; anything larger is refused. */
         int maxChangedLines();
     }
@@ -49,7 +53,24 @@ public final class PatchStrategies {
         }
     };
 
-    public static final List<Strategy> ALL = List.of(CREDENTIAL, DOCKERFILE_NON_ROOT);
+    static final Strategy DEPENDENCY_BUMP = new Strategy() {
+        public String id() { return DependencyBumpStrategy.ID; }
+        public String label() { return "npm and pip dependencies with a known vulnerability (OSV) and a published fixed version"; }
+        public int maxChangedLines() { return 2; } // the dependency's line: one removal, one addition
+        public boolean supports(AssessmentFindingDto finding) { return DependencyBumpStrategy.supports(finding); }
+        public Result propose(String path, List<String> lines, int lineNumber) throws RemediationException {
+            throw new RemediationException("A dependency bump needs the advisory from its finding.");
+        }
+        @Override
+        public Result propose(AssessmentFindingDto finding, String path, List<String> lines, int lineNumber) throws RemediationException {
+            DependencyBumpStrategy.Proposal proposal = DependencyBumpStrategy.propose(finding, lines, lineNumber);
+            return new Result(proposal.newLines(), null, proposal.explanation(), List.of(
+                    new RepairCheckDto("Advisory re-check", "not_run", "The security re-scan in the sandbox looks the new version up in OSV again; the fix counts only if the advisory is gone."),
+                    new RepairCheckDto("Lock file", "not_run", proposal.lockFileNote())), false);
+        }
+    };
+
+    public static final List<Strategy> ALL = List.of(CREDENTIAL, DOCKERFILE_NON_ROOT, DEPENDENCY_BUMP);
 
     public static Optional<Strategy> forFinding(AssessmentFindingDto finding) {
         return ALL.stream().filter(strategy -> strategy.supports(finding)).findFirst();

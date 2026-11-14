@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle2, ClipboardCheck, KeyRound, ShieldAlert, ShieldCheck, UserRoundCog } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ClipboardCheck, Download, KeyRound, ShieldAlert, ShieldCheck, UserRoundCog } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Panel } from '@/components/common/Panel';
 import { ErrorState, LoadingState } from '@/components/feedback/States';
-import { apiGet, apiPut } from '@/lib/api/client';
+import { apiDownload, apiGet, apiPut } from '@/lib/api/client';
 import { useAuth } from '@/features/auth/authContext';
 import type { RecoveryPolicy, RecoveryPolicyMode } from '@/types/domain';
 
@@ -16,6 +16,7 @@ export function SettingsPage() {
   const [confirmPolicy, setConfirmPolicy] = useState<RecoveryPolicy | null>(null);
   const [typedConfirmation, setTypedConfirmation] = useState('');
   const [notice, setNotice] = useState('');
+  const [auditDays, setAuditDays] = useState(90);
   const policies = useQuery({ queryKey: ['policies'], queryFn: () => apiGet<RecoveryPolicy[]>('/api/recovery-policies') });
   const updatePolicy = useMutation({ mutationFn: ({ id, mode, confirmation }: { id: string; mode: RecoveryPolicyMode; confirmation?: string }) => apiPut<RecoveryPolicy, { mode: RecoveryPolicyMode; confirmation?: string }>(`/api/recovery-policies/${id}`, { mode, confirmation }), onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['policies'] }); setConfirmPolicy(null); setTypedConfirmation(''); setNotice('Recovery policy updated in the active backend.'); }, onError: (error) => setNotice(error.message) });
   if (policies.isLoading) return <LoadingState label="Loading recovery policies" />;
@@ -29,7 +30,7 @@ export function SettingsPage() {
   return <>
     <PageHeader title="Settings & security" description="Control which recovery operations are permitted and require explicit confirmation for higher-risk policy changes." />
     <div className="settings-grid">
-      <aside className="settings-nav panel"><div className="settings-nav-item active"><ShieldCheck size={15} /> Recovery policies</div><div className="settings-nav-item"><UserRoundCog size={15} /> Access and roles <span>Planned</span></div><div className="settings-nav-item"><KeyRound size={15} /> API keys <span>Planned</span></div><div className="settings-nav-item"><ClipboardCheck size={15} /> Audit history <span>Planned</span></div></aside>
+      <aside className="settings-nav panel"><div className="settings-nav-item active"><ShieldCheck size={15} /> Recovery policies</div><div className="settings-nav-item"><UserRoundCog size={15} /> Access and roles <span>Planned</span></div><div className="settings-nav-item"><KeyRound size={15} /> API keys <span>Planned</span></div><div className="settings-nav-item"><ClipboardCheck size={15} /> Audit export</div></aside>
       <div className="settings-main">
         <Panel title="Recovery policies" subtitle="Diagnosis does not grant permission to perform an action" provenance={policies.data.provenance}>
           {isAdmin ? null : <div className="info-box" style={{ margin: 14 }} role="note"><ShieldCheck size={14} /> Only an admin can change recovery policies. They apply to every user of this RELAY.</div>}
@@ -46,6 +47,12 @@ export function SettingsPage() {
           <div className="warning-box"><ShieldAlert size={16} /> You are allowing automatic execution for <strong>{confirmPolicy.action}</strong>. Check the configured target allowlist and keep production changes separately controlled.</div>
           <div className="policy-confirm-form"><div className="field"><label htmlFor="policy-confirm">Type CONFIRM-AUTO-REPAIR to continue</label><input className="input mono" id="policy-confirm" value={typedConfirmation} onChange={(event) => setTypedConfirmation(event.target.value)} autoComplete="off" /></div><div className="form-actions"><button className="btn" onClick={() => { setConfirmPolicy(null); setTypedConfirmation(''); setDraftModes((old) => { const next = { ...old }; delete next[confirmPolicy.id]; return next; }); }}>Cancel</button><button className="btn btn-primary" disabled={typedConfirmation !== 'CONFIRM-AUTO-REPAIR' || updatePolicy.isPending} onClick={() => { updatePolicy.mutate({ id: confirmPolicy.id, mode: 'allow_automatically', confirmation: typedConfirmation }); setDraftModes((old) => { const next = { ...old }; delete next[confirmPolicy.id]; return next; }); }}>Confirm policy</button></div></div>
         </Panel> : null}
+        <Panel title="Audit export" subtitle="Every incident, recovery action (who or which policy started it, what ran, whether it verified), outcome and pushed code fix, oldest first">
+          {isAdmin ? <div className="audit-export"><select className="select filter-select" value={auditDays} onChange={(e) => setAuditDays(Number(e.target.value))} aria-label="Audit period"><option value={30}>Last 30 days</option><option value={90}>Last 90 days</option><option value={365}>Last year</option></select>
+            <button className="btn" onClick={() => void apiDownload(`/api/audit/export?format=csv&days=${auditDays}`, 'relay-audit.csv').catch((error: Error) => setNotice(error.message))}><Download size={13} /> CSV (spreadsheets)</button>
+            <button className="btn" onClick={() => void apiDownload(`/api/audit/export?format=json&days=${auditDays}`, 'relay-audit.json').catch((error: Error) => setNotice(error.message))}><Download size={13} /> JSON (SIEM)</button></div>
+            : <div className="info-box" role="note"><ShieldCheck size={14} /> Only an admin can export the audit trail: it names operators and policies.</div>}
+        </Panel>
         <Panel title="Environment boundaries" subtitle="Monitoring may be configured for external targets; automated recovery remains allowlist- and policy-controlled">
           <div className="environment-row"><div className="environment-tag">Development</div><div><strong>Development and staging</strong><p>Use authorized targets and verify the recovery procedure before enabling automatic action.</p></div><span className="risk-tag low">Preferred</span></div><div className="environment-row"><div className="environment-tag production">Production</div><div><strong>Production</strong><p>Recovery is disabled for production applications by the current backend policy. Monitoring does not imply permission to modify the target.</p></div><span className="risk-tag high">Restricted</span></div>
         </Panel>

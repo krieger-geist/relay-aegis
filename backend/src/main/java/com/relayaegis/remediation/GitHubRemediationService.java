@@ -308,7 +308,7 @@ public class GitHubRemediationService {
         PatchStrategies.Strategy strategy = PatchStrategies.byId(job.strategy)
                 .orElseThrow(() -> new RemediationException("The patch strategy is no longer available."));
         List<String> lines = PatchProposalService.splitLines(original);
-        PatchStrategies.Result result = strategy.propose(finding.file(), lines, finding.line() == null ? 1 : finding.line());
+        PatchStrategies.Result result = strategy.propose(finding, finding.file(), lines, finding.line() == null ? 1 : finding.line());
         UnifiedDiff.Result diff = UnifiedDiff.compute(finding.file(), PatchProposalService.redact(lines, result.secretValue()),
                 PatchProposalService.redact(result.newLines(), result.secretValue()), 3);
         if (job.patchText == null || !job.patchText.equals(diff.patch())) {

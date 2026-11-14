@@ -32,11 +32,11 @@ and policy-gated, and AI only proposes. That is exactly what stops companies tru
 | Observability of RELAY | Actuator only; no Prometheus metrics, traces or structured logs | Must fit into their existing monitoring |
 | Platforms | Kubernetes done in Phase 3 (v1.3.0): Deployments, Helm chart, tested on kind. No cloud APIs yet | Most companies run Kubernetes or a cloud |
 | Signals | Health checks, container state and logs only; corrupt data with green health is missed | Real incidents show up first in error rates, latency and user flows |
-| Integrations | Done in Phase 2 (v1.2.0): Alertmanager, Sentry and webhook in; Slack (with approvals) and signed webhook out. PagerDuty and email still missing | It has to plug into the on-call workflow |
+| Integrations | Done in Phase 2 (v1.2.0) and v1.5.0: Alertmanager, Sentry and webhook in; Slack (with approvals), PagerDuty and signed webhook out. Email still missing | It has to plug into the on-call workflow |
 | Runbooks | Done in Phase 2 (v1.2.0): YAML runbooks in Git, validated on load | Teams want reviewed, versioned runbooks as code |
-| Code healing | Two fix strategies; personal access token | Breadth, and GitHub App auth is the standard |
-| Proof | Results from rehearsals, not continuous measurement | MTTD/MTTR trends and SLOs are how reliability is judged |
-| Product | Single tenant, local accounts; multi-tenant plan written for Phase 7 | Teams, SSO and audit export are required to adopt |
+| Code healing | Three deterministic fix strategies including OSV dependency bumps (v1.5.0); personal access token | Breadth, and GitHub App auth is the standard |
+| Proof | Done in v1.5.0: nightly chaos run on kind with a published trend, MTTD/MTTR scorecard, post-incident reports | MTTD/MTTR trends and SLOs are how reliability is judged |
+| Product | Single tenant, local accounts; audit export done (v1.5.0); multi-tenant plan written as future work | Teams, SSO and audit export are required to adopt |
 
 ## Phased plan
 
@@ -110,25 +110,35 @@ run live in Docker: `corrupt-record` was quarantined after approval, and a broke
 
 **Done when:** `corrupt-record` is detected and quarantined with approval, and a bad deploy is rolled back.
 
-### Phase 5: Broader code healing (3–4 weeks)
-- GitHub App authentication instead of a personal token.
-- New deterministic strategies: vulnerable dependency bumps (OSV data), missing timeouts, hard-coded URLs to config.
-- AI-proposed patches for findings without a strategy, gated by the same sandbox, tests, re-scan and approval.
-- Each fix PR adds a regression test that reproduces the original failure.
+### Phase 5: Continuous proof and broader code healing
+**Status: done, released in v1.5.0.** The original Phases 5, 6 and 7 were folded into one final phase on 2026-11-14,
+keeping the items with the most value per day of work:
 
-### Phase 6: Continuous proof (ongoing)
-- Nightly chaos run in CI on `kind`; MTTD / MTTR per failure type published as a trend.
-- SLOs and error budgets per system; generated post-incident report from stored evidence.
-- Public benchmark page: failure types, detection and recovery times, false-action rate (target: zero).
+- Post-incident report generated from stored evidence (page, PDF via print, Markdown).
+- Reliability scorecard: MTTD / MTTR per failure type and as a trend, verified share, and actions that did not fix
+  anything (the false-action rate, target zero).
+- Nightly chaos run in CI on `kind`, with the trend published to the `chaos-results` branch.
+- OSV dependency advisories and a deterministic bump to the fixed version, verified by an OSV re-check in the sandbox.
+- PagerDuty notifier (Events API v2) and an admin audit export (CSV / JSON).
 
-### Phase 7: Product readiness
-- Organisations, teams and role-based access per system; OIDC single sign-on.
-- Multi-tenant hosted RELAY (plan below): anyone signs up through the public link and connects only their own systems.
-- Audit log export; data retention settings; hardened deployment guide.
-- More notifiers: email and PagerDuty (Events API v2), next to Slack and the webhook.
-- Documentation site, one-command install, hosted read-only demo.
+SLOs and error budgets per system shipped earlier, in v1.4.0.
 
-## Multi-tenant plan (Phase 7)
+## Future work
+
+Written down deliberately rather than half-built. Each needs accounts, money or a larger design, and none of it
+changes how RELAY detects, diagnoses, acts and verifies.
+
+| Item | Why it waits |
+|---|---|
+| Multi-tenant hosted RELAY with an outbound agent (plan below) | The largest change: tenant ids on every table, row-level security, and an agent so a public RELAY never holds access to other people's machines |
+| Organisations, teams, per-system roles, OIDC single sign-on | Comes with multi-tenancy; local accounts with roles cover one team today |
+| GitHub App authentication | Needs a registered GitHub App; the fine-grained personal token is scoped to allowlisted repositories meanwhile |
+| AI-proposed patches for findings with no strategy | Must pass the same sandbox, tests, re-scan and approval; deterministic strategies first keeps every change explainable |
+| More strategies: missing timeouts, hard-coded URLs to config | Same pattern as the three existing strategies |
+| Email notifier, data retention settings | Small; Slack, PagerDuty and the signed webhook cover on-call today |
+| Documentation site, one-command install, hosted read-only demo | Hosting costs; the README, `docs/` and the AWS guide cover installation |
+
+## Multi-tenant plan (future work)
 
 Goal: one public RELAY where anyone can sign up, connect their own systems, and never see or touch anyone else's.
 Today every signed-in account sees all applications, incidents and policies, which is fine for one team and not for
