@@ -506,3 +506,56 @@ export interface SloStatus {
   budgetRemaining: number | null;
   alert: 'fast_burn' | 'slow_burn' | null;
 }
+
+/** Blameless post-incident report built by the backend from stored records only. */
+export interface PostIncidentReport {
+  incidentId: string;
+  title: string;
+  application: string;
+  component: string;
+  severity: string;
+  outcome: string;
+  detectedAt: string;
+  recoveredAt: string | null;
+  detectionMs: number | null;
+  recoveryMs: number | null;
+  summary: string | null;
+  rootCause: string;
+  failureType: string;
+  confidence: string;
+  diagnosisSource: string;
+  timeline: { at: string | null; label: string; detail: string | null }[];
+  actions: { attempt: number; action: string; target: string | null; automatic: boolean; policy: string | null; phase: string; verification: string | null; detail: string | null; at: string | null }[];
+  verification: string;
+  evidence: string[];
+  followUps: string[];
+  similarIncidents30d: number;
+  generatedAt: string;
+  markdown: string;
+}
+
+export interface ScorecardTotals {
+  incidents: number;
+  verified: number;
+  resolvedOnOwn: number;
+  open: number;
+  medianDetectMs: number | null;
+  p90DetectMs: number | null;
+  medianRecoverMs: number | null;
+  p90RecoverMs: number | null;
+  actionsRun: number;
+  automaticActions: number;
+  actionsNotVerified: number;
+  verifiedShare: number | null;
+}
+
+/** Measured MTTD / MTTR per failure type and over time. Unmeasured durations are null, never estimated. */
+export interface ReliabilityScorecard {
+  days: number;
+  since: string;
+  totals: ScorecardTotals;
+  byType: { failureType: string; incidents: number; verified: number; medianDetectMs: number | null; medianRecoverMs: number | null; automaticActions: number; actionsNotVerified: number }[];
+  bucketSize: 'day' | 'week';
+  trend: { start: string; incidents: number; verified: number; medianDetectMs: number | null; medianRecoverMs: number | null }[];
+  generatedAt: string;
+}

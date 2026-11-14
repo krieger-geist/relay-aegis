@@ -20,7 +20,7 @@ services:
     restart: unless-stopped
 
   backend:
-    image: ghcr.io/krieger-geist/relay-aegis-backend:${RELAY_VERSION:-1.4.0}
+    image: ghcr.io/krieger-geist/relay-aegis-backend:${RELAY_VERSION:-1.5.0}
     pull_policy: missing
     restart: unless-stopped
     mem_limit: 900m
@@ -42,7 +42,7 @@ services:
       RELAY_DOCKER_ALLOWED_CONTAINERS: "relay-aegis-test-target"
 
   frontend:
-    image: ghcr.io/krieger-geist/relay-aegis-frontend:${RELAY_VERSION:-1.4.0}
+    image: ghcr.io/krieger-geist/relay-aegis-frontend:${RELAY_VERSION:-1.5.0}
     pull_policy: missing
     restart: unless-stopped
     mem_limit: 64m

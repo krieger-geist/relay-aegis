@@ -5,6 +5,36 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-14
+
+Phase 5: continuous proof and broader code healing. This is the last planned phase; the rest of the roadmap is
+written up as future work.
+
+### Added
+- Post-incident report per incident (`GET /api/incidents/{id}/report`, `.../report.md`, and a **Report** page):
+  summary, root cause with confidence and who diagnosed it, a timeline, every journaled action, verification,
+  evidence and follow-ups. Built only from stored records, never by AI; anything not recorded says so. Follow-ups are
+  derived from the records: recurrence on the same component in 30 days, no runbook, an action that needed approval,
+  an attempt that did not verify, missing evidence, slow detection. Print to PDF or download Markdown.
+- Reliability scorecard (`GET /api/reliability/scorecard?days=`, **Scorecard** page): median and p90 time to detect
+  and to recover, recovered-and-verified share, automatic share, and actions that ran without fixing anything (target
+  0), per failure type and as a daily or weekly trend. Unmeasured durations are skipped, never estimated; only
+  verified recoveries count towards time to recover.
+- Nightly chaos run (`.github/workflows/nightly-chaos.yml`): breaks a real Deployment on kind five ways, measures from
+  outside RELAY, and publishes `TREND.md` and `nightly.csv` to the `chaos-results` branch and the run summary.
+  `scripts/k8s-e2e.sh` now also writes a CSV row per scenario and RELAY's own scorecard for the run.
+- PagerDuty notifier (Events API v2, `RELAY_PAGERDUTY_ROUTING_KEY`): one alert per incident, triggered on open,
+  updated when approval is needed or a recovery fails (raised one severity level), resolved when recovery is verified.
+- Audit export for admins (`GET /api/audit/export?format=csv|json&days=`, Settings): incidents, every recovery action
+  with who or which policy started it, outcomes and pushed code fixes. CSV cells that a spreadsheet would run as a
+  formula are neutralised.
+- Dependency advisories in Codebase investigations: pinned npm (`package.json`) and pip (`requirements.txt`) versions
+  are looked up in OSV (osv.dev); only names and versions are sent. An unreachable OSV is reported as *not run*,
+  never as clean. Turn off with `RELAY_ASSESSMENT_OSV_ENABLED=false`.
+- Third deterministic fix strategy, `dependency-bump-to-fixed-version`: changes the one vulnerable version to the
+  lowest fixed version (keeping `^`, `~`, `==`), refuses a stale line, warns when it crosses a major version, and
+  notes the lock file. The sandbox security re-scan queries OSV again, so the fix counts only if the advisory is gone.
+
 ## [1.4.0] - 2026-11-13
 
 Phase 4: deeper detection.
@@ -204,7 +234,8 @@ First public release: the Sentry × Dezyne E'cole Hackathon 2026 system, with re
 ### Changed
 - Frontend image installs dependencies with `npm ci` from the lockfile for reproducible builds.
 
-[Unreleased]: https://github.com/krieger-geist/relay-aegis/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/krieger-geist/relay-aegis/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/krieger-geist/relay-aegis/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/krieger-geist/relay-aegis/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/krieger-geist/relay-aegis/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/krieger-geist/relay-aegis/compare/v1.2.0...v1.3.0

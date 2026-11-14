@@ -64,6 +64,10 @@ relay:
     # X-Relay-Signature: sha256=HMAC(secret, "<X-Relay-Timestamp>.<body>").
     webhook-url: ${RELAY_NOTIFY_WEBHOOK_URL:}
     webhook-secret: ${RELAY_NOTIFY_WEBHOOK_SECRET:}
+    pagerduty:
+      # PagerDuty Events API v2 integration key. One alert per incident: triggered on open, resolved when recovery is verified.
+      routing-key: ${RELAY_PAGERDUTY_ROUTING_KEY:}
+      url: ${RELAY_PAGERDUTY_URL:https://events.pagerduty.com/v2/enqueue}
   # The address people open RELAY at (links in Slack and webhook messages), e.g. https://relay.example.com
   public-url: ${RELAY_PUBLIC_URL:}
   runbooks:
@@ -181,6 +185,10 @@ relay:
       approvers: ${RELAY_GITHUB_REMEDIATION_APPROVERS:}
       timeout-seconds: 20
   assessment:
+    osv:
+      # Look pinned npm/pip dependency versions up in OSV (osv.dev) during Codebase investigations. Only names and versions are sent.
+      enabled: ${RELAY_ASSESSMENT_OSV_ENABLED:true}
+      url: ${RELAY_ASSESSMENT_OSV_URL:https://api.osv.dev}
     # Exact hostname allowlist; public hostnames must be explicitly added by the operator.
     allowed-hosts: ${RELAY_ASSESSMENT_ALLOWED_HOSTS:localhost,127.0.0.1,test-target}
     # Opt-in: also accept any host that resolves only to public IPs (private/internal targets stay blocked).

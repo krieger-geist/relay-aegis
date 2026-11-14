@@ -342,3 +342,23 @@
   --brand-700: #4356c8;
   --brand-800: #3748ac;
 }
+
+/* Phase 5: post-incident report and audit export */
+.report-page .panel { margin-bottom: 14px; }
+.report-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.report-note { color: var(--text-muted); font-size: 13px; margin: 0 0 14px; }
+.report-facts { margin-bottom: 14px; }
+.report-fact { font-size: 15px; font-weight: 600; margin-top: 6px; overflow-wrap: anywhere; }
+.report-text { margin: 0; line-height: 1.6; overflow-wrap: anywhere; }
+.report-list { margin: 0; padding-left: 18px; line-height: 1.6; }
+.report-list.followups { list-style: none; padding-left: 0; }
+.report-list.followups li { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 6px; }
+.report-list.followups svg { flex: none; margin-top: 4px; color: var(--brand-600); }
+.nowrap { white-space: nowrap; }
+.audit-export { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+@media print {
+  .sidebar, .topbar, .top-bar, .mobile-backdrop, .no-print { display: none !important; }
+  body, .app-shell, .main-area, .page-content { background: #fff !important; color: #000 !important; margin: 0 !important; padding-left: 0 !important; }
+  .report-page .panel { box-shadow: none; border-color: #ccc; break-inside: avoid; }
+  .table-scroll { overflow: visible !important; }
+}

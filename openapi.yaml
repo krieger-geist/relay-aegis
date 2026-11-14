@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: RELAY AEGIS API
-  version: 1.4.0
+  version: 1.5.0
   description: >-
     Evidence-driven self-healing API: monitoring, deterministic diagnosis, policy-gated runtime recovery,
     live URL and GitHub assessment, sandbox-validated Auto-Repair and approval-gated pull requests.
@@ -167,6 +167,45 @@ paths:
         '200': {description: OK}
         '401': {description: Missing or invalid access token}
         '404': {description: Application not found}
+  /api/incidents/{id}/report:
+    get:
+      summary: Post-incident report
+      description: Blameless report built only from stored records (timeline, root cause, actions, verification, evidence, follow-ups), with the same report as Markdown in the markdown field.
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+        '404': {description: Incident not found}
+  /api/incidents/{id}/report.md:
+    get:
+      summary: Post-incident report as a Markdown download
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200': {description: 'text/markdown attachment'}
+        '401': {description: Missing or invalid access token}
+        '404': {description: Incident not found}
+  /api/reliability/scorecard:
+    get:
+      summary: Reliability scorecard
+      description: Median and p90 time to detect and to recover, verified share, automatic share and actions that did not fix anything, per failure type and as a trend. Unmeasured durations are null.
+      parameters:
+        - {name: days, in: query, required: false, schema: {type: integer, default: 30, minimum: 1, maximum: 365}}
+      responses:
+        '200': {description: OK}
+        '401': {description: Missing or invalid access token}
+  /api/audit/export:
+    get:
+      summary: Audit trail export (ADMIN)
+      description: Incidents, recovery actions (who or which policy started each), outcomes and pushed code fixes, oldest first.
+      parameters:
+        - {name: format, in: query, required: false, schema: {type: string, enum: [csv, json], default: csv}}
+        - {name: days, in: query, required: false, schema: {type: integer, default: 90}}
+      responses:
+        '200': {description: 'CSV or JSON attachment'}
+        '401': {description: Missing or invalid access token}
+        '403': {description: Not an admin}
   /api/applications/{id}:
     get:
       summary: Application detail

@@ -15,7 +15,11 @@ ROOT="$(cd "$(dirname "$0")/.." && (pwd -W 2>/dev/null || pwd))"
 NS=relay-system
 DEMO=demo
 TIMEOUT=${SCENARIO_TIMEOUT:-180}
-RESULTS="$ROOT/chaos/results/kubernetes-$(date +%Y%m%d-%H%M%S).md"
+STAMP=$(date +%Y%m%d-%H%M%S)
+RESULTS="$ROOT/chaos/results/kubernetes-$STAMP.md"
+# One row per scenario, for the nightly trend (scripts/chaos_trend.py).
+CSV="$ROOT/chaos/results/nightly-$STAMP.csv"
+RUN_DATE=$(date -u +%Y-%m-%dT%H:%MZ)
 PORT=18080
 E2E_EMAIL=e2e@relay.test
 # A throwaway account on a throwaway cluster, fixed so a re-run with SKIP_SETUP can sign in again.
@@ -128,6 +132,7 @@ run_scenario() {
   if [ "$healed" = 1 ]; then result=healed; else result=NOT-HEALED; failed=$((failed+1)); kubectl -n "$DEMO" get pods; fi
   step "$name: $result detect=${detect:-?}s outage=${outage} healed_after=${recover}s actions=[${action:-none}]"
   echo "| $name | $expected | ${detect:-?} s | ${outage} | ${recover} s | ${action:-none} | $result |" >> "$RESULTS"
+  echo "$RUN_DATE,$name,$expected,${detect:-},${outage% s},$recover,$result" | sed 's/,none,/,,/' >> "$CSV"
 }
 
 inject_pod() { kubectl -n "$DEMO" exec "$1" -- node -e "fetch('http://127.0.0.1:3000/chaos/pool-exhausted',{method:'POST'}).then(()=>process.exit(0))"; }
@@ -148,6 +153,7 @@ mkdir -p "$(dirname "$RESULTS")"
   echo "| Failure | Expected action | Detected after | Outage seen from outside | Healed after | Recovery actions | Result |"
   echo "|---|---|---|---|---|---|---|"
 } > "$RESULTS"
+echo "date,scenario,expected_action,detect_s,outage_s,healed_s,result" > "$CSV"
 
 run_scenario "Scaled to zero" SCALE_WORKLOAD 'kubectl -n demo scale deploy/test-target --replicas=0 >/dev/null'
 run_scenario "Bad image rollout" ROLLOUT_UNDO 'kubectl -n demo set image deploy/test-target app=relay-aegis-test-target:does-not-exist >/dev/null'
@@ -155,6 +161,8 @@ run_scenario "Crashing rollout" ROLLOUT_UNDO "kubectl -n demo patch deploy test-
 run_scenario "All pods stuck" RESTART_CONTAINER 'inject_pod "$(first_pod)"'
 run_scenario "One bad pod of three" DELETE_POD 'inject_pod "$(first_pod)"' 3
 kubectl -n "$DEMO" scale deploy/test-target --replicas=1 >/dev/null
+# RELAY's own measurement of the same run, next to the outside view above.
+api GET "/api/reliability/scorecard?days=1" > "$ROOT/chaos/results/scorecard-$STAMP.json" || true
 
 echo
 cat "$RESULTS"

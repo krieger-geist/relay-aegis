@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { NavLink, Link } from 'react-router-dom';
-import { Activity, AppWindow, Blocks, Bug, ClipboardList, FileCode2, Globe, LayoutDashboard, Settings2, Wrench, X } from 'lucide-react';
+import { Activity, AppWindow, BarChart3, Blocks, Bug, ClipboardList, FileCode2, Globe, LayoutDashboard, Settings2, Wrench, X } from 'lucide-react';
 import { isOpenIncident, useAcknowledgedIncidents } from '@/lib/incidentNotifications';
 import { apiGet } from '@/lib/api/client';
 import type { Incident } from '@/types/domain';
@@ -13,6 +13,7 @@ const sections: { label: string; items: NavItem[] }[] = [
     { to: '/applications', label: 'Systems', icon: AppWindow },
     { to: '/incidents', label: 'Incidents', icon: Bug },
     { to: '/history', label: 'Recovery history', icon: ClipboardList },
+    { to: '/scorecard', label: 'Scorecard', icon: BarChart3 },
   ] },
   { label: 'Code', items: [
     { to: '/codebase', label: 'Repositories', icon: FileCode2 },

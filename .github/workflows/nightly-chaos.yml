@@ -1,0 +1,73 @@
+name: Nightly chaos
+
+# Every night: break a real Kubernetes workload on kind five ways, measure detection and healing from outside RELAY,
+# and publish the running trend to the chaos-results branch (TREND.md) and the run summary.
+on:
+  schedule:
+    - cron: "30 21 * * *" # 03:00 IST
+  workflow_dispatch:
+
+permissions:
+  contents: write # only to push the chaos-results branch
+
+concurrency:
+  group: nightly-chaos
+  cancel-in-progress: false
+
+jobs:
+  chaos:
+    name: Break, heal, measure
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.19.0
+      - name: Install kind
+        run: |
+          curl -fsSL -o kind https://github.com/kubernetes-sigs/kind/releases/download/v0.30.0/kind-linux-amd64
+          chmod +x kind
+          sudo mv kind /usr/local/bin/kind
+      - name: Break things and prove they heal
+        id: chaos
+        continue-on-error: true
+        run: scripts/k8s-e2e.sh
+      - name: Update the trend
+        if: always()
+        run: |
+          git fetch origin chaos-results:chaos-results 2>/dev/null || true
+          mkdir -p ../history
+          if git rev-parse --verify chaos-results >/dev/null 2>&1; then
+            git show chaos-results:nightly.csv > ../history/nightly.csv 2>/dev/null || true
+          fi
+          python3 scripts/chaos_trend.py ../history/nightly.csv ../history/TREND.md chaos/results/nightly-*.csv
+          cat ../history/TREND.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish to the chaos-results branch
+        if: always() && github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git rev-parse --verify chaos-results >/dev/null 2>&1; then
+            git worktree add ../publish chaos-results
+          else
+            git worktree add --detach ../publish && git -C ../publish checkout --orphan chaos-results && git -C ../publish rm -rfq .
+          fi
+          cp ../history/nightly.csv ../history/TREND.md ../publish/
+          cp chaos/results/scorecard-*.json ../publish/latest-scorecard.json 2>/dev/null || true
+          cd ../publish
+          git add nightly.csv TREND.md latest-scorecard.json 2>/dev/null || git add nightly.csv TREND.md
+          git diff --cached --quiet || git commit -qm "Nightly chaos results $(date -u +%Y-%m-%d)"
+          git push -q origin chaos-results
+      - name: Keep tonight's files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-chaos-${{ github.run_id }}
+          path: chaos/results/
+          retention-days: 90
+      - name: Fail when a scenario did not heal
+        if: steps.chaos.outcome != 'success'
+        run: |
+          echo "At least one scenario did not heal; see the trend and the e2e step log."
+          exit 1

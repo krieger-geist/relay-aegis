@@ -9,6 +9,8 @@ import { IncidentDetailPage } from '@/features/incidents/IncidentDetailPage';
 import { AssessmentsPage, InvestigationRedirect } from '@/features/assessments/AssessmentsPage';
 import { RepairsPage } from '@/features/repairs/RepairsPage';
 import { RecoveryHistoryPage } from '@/features/history/RecoveryHistoryPage';
+import { ScorecardPage } from '@/features/history/ScorecardPage';
+import { IncidentReportPage } from '@/features/incidents/IncidentReportPage';
 import { IntegrationsPage } from '@/features/integrations/IntegrationsPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 import { EmptyState } from '@/components/feedback/States';
@@ -35,12 +37,14 @@ export default function App() {
       <Route path="applications/:id" element={<ApplicationDetailPage />} />
       <Route path="incidents" element={<IncidentsPage />} />
       <Route path="incidents/:id" element={<IncidentDetailPage />} />
+      <Route path="incidents/:id/report" element={<IncidentReportPage />} />
       <Route path="codebase" element={<AssessmentsPage key="level-2" level={2} />} />
       <Route path="live-url" element={<AssessmentsPage key="level-3" level={3} />} />
       <Route path="assessments" element={<InvestigationRedirect />} />
       <Route path="repairs" element={<RepairsPage />} />
       <Route path="repairs/:id" element={<RepairsPage />} />
       <Route path="history" element={<RecoveryHistoryPage />} />
+      <Route path="scorecard" element={<ScorecardPage />} />
       <Route path="integrations" element={<IntegrationsPage />} />
       <Route path="settings" element={<SettingsPage />} />
       <Route path="*" element={<NotFoundPage />} />

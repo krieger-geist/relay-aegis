@@ -42,3 +42,24 @@ export async function apiPost<T, B = unknown>(path: string, body?: B): Promise<A
 export async function apiPut<T, B = unknown>(path: string, body: B): Promise<ApiResponse<T>> {
   return apiRequest<T>(path, { method: 'PUT', body: JSON.stringify(body) });
 }
+
+/** Downloads a file (CSV, Markdown) with the same auth and refresh as apiRequest, and saves it under the server's name. */
+export async function apiDownload(path: string, fallbackName: string): Promise<void> {
+  const token = getAccessToken();
+  const init: RequestInit = { headers: token ? { Authorization: `Bearer ${token}` } : {} };
+  let response = await send(path, init);
+  if (response.status === 401) {
+    const refreshed = await refreshSession().catch(() => null);
+    if (refreshed) response = await send(path, { headers: { Authorization: `Bearer ${refreshed.accessToken}` } });
+  }
+  if (!response.ok) throw await errorFromResponse(response);
+  const name = /filename="([^"]+)"/.exec(response.headers.get('Content-Disposition') ?? '')?.[1] ?? fallbackName;
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = name;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}

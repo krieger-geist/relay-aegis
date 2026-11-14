@@ -150,7 +150,7 @@ public class PatchProposalService {
                     .orElseThrow(() -> new RemediationException("The recorded patch strategy is no longer available."));
             String content = fetcher.fetchFile(job.repository + ".git", job.commitSha, finding.file());
             List<String> lines = splitLines(content);
-            PatchStrategies.Result proposal = strategy.propose(finding.file(), lines, finding.line() == null ? 1 : finding.line());
+            PatchStrategies.Result proposal = strategy.propose(finding, finding.file(), lines, finding.line() == null ? 1 : finding.line());
             UnifiedDiff.Result diff = UnifiedDiff.compute(finding.file(),
                     redact(lines, proposal.secretValue()), redact(proposal.newLines(), proposal.secretValue()), 3);
             int changed = diff.additions().size() + diff.removals().size();
