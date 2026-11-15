@@ -5,6 +5,14 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-11-15
+
+### Fixed
+- Link previews: LinkedIn, Slack and X showed no card for a RELAY address. The page now carries Open Graph and Twitter
+  card tags and a 1200x627 preview image (`/og-image.png`). nginx fills in the absolute address the page was served
+  from (honouring `X-Forwarded-Proto` behind Caddy or an ingress), so every installation previews its own URL.
+- A real `robots.txt` instead of the single-page fallback; `/api/` is disallowed.
+
 ## [1.5.0] - 2026-11-14
 
 Phase 5: continuous proof and broader code healing. This is the last planned phase; the rest of the roadmap is
@@ -234,7 +242,8 @@ First public release: the Sentry × Dezyne E'cole Hackathon 2026 system, with re
 ### Changed
 - Frontend image installs dependencies with `npm ci` from the lockfile for reproducible builds.
 
-[Unreleased]: https://github.com/krieger-geist/relay-aegis/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/krieger-geist/relay-aegis/compare/v1.5.1...HEAD
+[1.5.1]: https://github.com/krieger-geist/relay-aegis/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/krieger-geist/relay-aegis/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/krieger-geist/relay-aegis/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/krieger-geist/relay-aegis/compare/v1.3.0...v1.3.1

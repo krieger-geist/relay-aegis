@@ -1,0 +1,4 @@
+# Public pages are the sign-in screen and the link-preview image; everything else needs an account.
+User-agent: *
+Disallow: /api/
+Allow: /
