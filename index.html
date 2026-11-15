@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RELAY AEGIS: evidence-driven self-healing</title>
+<meta name="description" content="RELAY AEGIS detects failures in Docker and Kubernetes apps, diagnoses the cause, recovers safely behind policy gates, and marks nothing fixed until fresh health checks pass.">
+<link rel="canonical" href="https://krieger-geist.github.io/relay-aegis/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="RELAY AEGIS">
+<meta property="og:title" content="RELAY AEGIS: evidence-driven self-healing">
+<meta property="og:description" content="Detects failures, diagnoses the cause, recovers safely, and proves the fix worked. Open source, live on AWS.">
+<meta property="og:url" content="https://krieger-geist.github.io/relay-aegis/">
+<meta property="og:image" content="https://krieger-geist.github.io/relay-aegis/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="627">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://krieger-geist.github.io/relay-aegis/og-image.png">
+<style>
+  :root {
+    --bg: #0b1220; --panel: #111a2e; --line: #1e2a44; --text: #ffffff; --soft: #cbd5e1; --muted: #94a3b8;
+    --blue: #3b82f6; --blue-strong: #1d4ed8; --light-blue: #60a5fa; --green: #22c55e; --green-bg: #14532d;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  a { color: var(--light-blue); }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 20px; }
+  header.top { display: flex; align-items: center; justify-content: space-between; padding: 20px 0; }
+  .brand { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 22px; letter-spacing: .3px; text-decoration: none; color: var(--text); }
+  .brand b { color: var(--light-blue); }
+  .mark { width: 36px; height: 36px; border-radius: 9px; background: var(--blue-strong); display: grid; place-items: center; }
+  .top nav a { color: var(--soft); text-decoration: none; margin-left: 20px; font-size: 15px; }
+  .top nav a:hover { color: var(--text); }
+  .hero { display: grid; grid-template-columns: 1.1fr .9fr; gap: 44px; align-items: center; padding: 36px 0 64px; }
+  .eyebrow { display: inline-block; font-size: 13px; font-weight: 700; color: var(--green); background: rgba(34,197,94,.12); border: 1px solid rgba(34,197,94,.35); border-radius: 999px; padding: 4px 12px; margin-bottom: 18px; }
+  h1 { font-size: clamp(34px, 5vw, 52px); line-height: 1.1; margin: 0 0 18px; letter-spacing: -.5px; }
+  h1 span { color: var(--soft); }
+  .lead { color: var(--soft); font-size: 19px; margin: 0 0 28px; }
+  .buttons { display: flex; flex-wrap: wrap; gap: 12px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 13px 22px; border-radius: 12px; font-weight: 700; text-decoration: none; font-size: 16px; }
+  .btn.primary { background: var(--blue-strong); color: #fff; }
+  .btn.primary:hover { background: #2563eb; }
+  .btn.ghost { border: 1px solid var(--line); color: var(--text); background: var(--panel); }
+  .btn.ghost:hover { border-color: var(--blue); }
+  .note { color: var(--muted); font-size: 14px; margin-top: 14px; }
+  video { width: 100%; border-radius: 18px; border: 1px solid var(--line); display: block; background: #000; }
+  section { padding: 56px 0; border-top: 1px solid var(--line); }
+  h2 { font-size: 30px; margin: 0 0 10px; }
+  .sub { color: var(--muted); margin: 0 0 30px; }
+  .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 22px; }
+  .card .n { width: 34px; height: 34px; border-radius: 50%; background: var(--blue-strong); display: grid; place-items: center; font-weight: 800; margin-bottom: 12px; }
+  .card.verify { border-color: rgba(34,197,94,.5); background: linear-gradient(180deg, rgba(20,83,45,.55), var(--panel)); }
+  .card.verify .n { background: var(--green); }
+  .card h3 { margin: 0 0 6px; font-size: 19px; }
+  .card p { margin: 0; color: var(--soft); font-size: 15px; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .stat .big { font-size: 34px; font-weight: 800; color: var(--green); line-height: 1.1; }
+  .stat .big.blue { color: var(--light-blue); }
+  .stat p { color: var(--soft); margin: 8px 0 0; font-size: 15px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  ul.clean { margin: 0; padding-left: 20px; color: var(--soft); }
+  ul.clean li { margin: 6px 0; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 6px 14px; font-size: 14px; color: var(--soft); }
+  pre { background: #070c17; border: 1px solid var(--line); border-radius: 14px; padding: 18px; overflow-x: auto; color: var(--soft); font: 14px/1.7 Consolas, "SFMono-Regular", Menlo, monospace; margin: 0; }
+  footer { border-top: 1px solid var(--line); padding: 28px 0 40px; color: var(--muted); font-size: 14px; display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; }
+  @media (max-width: 860px) {
+    .hero { grid-template-columns: 1fr; gap: 30px; padding-top: 16px; }
+    .steps, .stats { grid-template-columns: 1fr 1fr; }
+    .two { grid-template-columns: 1fr; }
+    .top nav { display: none; }
+  }
+  @media (max-width: 480px) {
+    body { font-size: 16px; }
+    .wrap { padding: 0 16px; }
+    .steps, .stats { grid-template-columns: 1fr; }
+    .btn { width: 100%; justify-content: center; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="#">
+      <span class="mark" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,12 7,12 10,5 14,19 17,10 22,12"/></svg></span>
+      <span>RELAY <b>AEGIS</b></span>
+    </a>
+    <nav>
+      <a href="#how">How it works</a>
+      <a href="#proof">Proof</a>
+      <a href="#run">Run it</a>
+      <a href="https://github.com/krieger-geist/relay-aegis">GitHub</a>
+    </nav>
+  </header>
+
+  <div class="hero">
+    <div>
+      <span class="eyebrow">Open source · live on AWS</span>
+      <h1>Evidence-driven self-healing <span>for software you operate</span></h1>
+      <p class="lead">When an app goes down, most tools page a human. RELAY finds out why, fixes what is safe to fix, and marks nothing as fixed until fresh health checks pass.</p>
+      <div class="buttons">
+        <a class="btn primary" href="https://13-204-75-201.sslip.io/" rel="noopener">Try the live demo &rarr;</a>
+        <a class="btn ghost" href="https://github.com/krieger-geist/relay-aegis" rel="noopener">View the code on GitHub</a>
+      </div>
+      <p class="note">Sign up with any email, open Applications, then test-target, and watch RELAY record each failure, its cause, the fix and the proof.</p>
+    </div>
+    <video src="relay-aegis-15s.mp4" poster="poster.jpg" autoplay muted loop playsinline controls preload="metadata" aria-label="15-second animation: an app fails, RELAY detects, diagnoses, acts safely and verifies the recovery"></video>
+  </div>
+
+  <section id="how">
+    <h2>How it works</h2>
+    <p class="sub">RELAY checks each app every 60 seconds. When one fails, every step leaves a record.</p>
+    <div class="steps">
+      <div class="card"><div class="n">1</div><h3>Detect</h3><p>Opens an incident on crashes, failing health checks, bad deploys and SLO burn, and collects evidence from the container and its logs.</p></div>
+      <div class="card"><div class="n">2</div><h3>Diagnose</h3><p>Deterministic rules match the failure to its cause, so the same evidence always gives the same answer.</p></div>
+      <div class="card"><div class="n">3</div><h3>Act safely</h3><p>Every recovery passes a policy, an attempt limit and a circuit breaker, and lands in an audit trail.</p></div>
+      <div class="card verify"><div class="n">4</div><h3>Verify</h3><p>An incident closes only after fresh health checks pass. An action that ran is not proof that it worked.</p></div>
+    </div>
+  </section>
+
+  <section id="proof">
+    <h2>Proof, not promises</h2>
+    <p class="sub">Every number here is measured from outside RELAY or checked on every release.</p>
+    <div class="stats">
+      <div class="card stat"><div class="big">5 of 5</div><p>failures healed in the nightly chaos run, where CI breaks a real Kubernetes app in five ways</p></div>
+      <div class="card stat"><div class="big">&lt; 47 s</div><p>to heal and verify each of five real Kubernetes failures</p></div>
+      <div class="card stat"><div class="big blue">718</div><p>automated tests (543 backend, 175 frontend) pass on every release</p></div>
+      <div class="card stat"><div class="big blue">100%</div><p>of recoveries pass through policy gates and land in the audit trail</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="two">
+      <div class="card">
+        <h3>What else it does</h3>
+        <ul class="clean">
+          <li>Rolls back bad deploys and warns early on SLO burn</li>
+          <li>Writes a post-incident report for every incident, from stored records only</li>
+          <li>Reliability scorecard: MTTR counts only verified recoveries</li>
+          <li>PagerDuty alerts, role-based access and audit export</li>
+          <li>Checks dependencies against the OSV vulnerability database</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Safe to share in public</h3>
+        <ul class="clean">
+          <li>Only the admin can change healing policies on the live demo</li>
+          <li>Each visitor gets a fair hourly limit</li>
+          <li>The demo watches one safe demo app, so nobody can point it at someone else's system</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Built with</h2>
+    <p class="sub">A full stack, from the database to the cluster.</p>
+    <div class="chips">
+      <span class="chip">Java 21</span><span class="chip">Spring Boot</span><span class="chip">React</span><span class="chip">TypeScript</span>
+      <span class="chip">PostgreSQL</span><span class="chip">Docker</span><span class="chip">Kubernetes</span><span class="chip">Helm</span>
+      <span class="chip">GitHub Actions</span><span class="chip">AWS EC2</span><span class="chip">Caddy (HTTPS)</span>
+    </div>
+  </section>
+
+  <section id="run">
+    <h2>Run it on your own machine</h2>
+    <p class="sub">You need Docker Desktop and Git. Then add your own apps the same way as the demo app.</p>
+<pre>git clone https://github.com/krieger-geist/relay-aegis.git
+cd relay-aegis
+cp .env.example .env        # Windows: copy .env.example .env
+docker compose up -d --build
+# open http://localhost:5173 and sign up</pre>
+    <p class="note">Want your own copy on AWS? Follow the <a href="https://github.com/krieger-geist/relay-aegis/blob/main/docs/AWS.md">AWS guide</a>.</p>
+  </section>
+
+  <footer>
+    <span>RELAY AEGIS · open source</span>
+    <span><a href="https://13-204-75-201.sslip.io/">Live demo</a> · <a href="https://github.com/krieger-geist/relay-aegis">GitHub</a></span>
+  </footer>
+</div>
+</body>
+</html>
