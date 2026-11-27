@@ -59,3 +59,8 @@ date,scenario,expected_action,detect_s,outage_s,healed_s,result
 2026-11-26T03:43Z,Crashing rollout,ROLLOUT_UNDO,0.9,,9.7,healed
 2026-11-26T03:43Z,One bad pod of three,DELETE_POD,9.2,1.2,13.0,healed
 2026-11-26T03:43Z,Scaled to zero,SCALE_WORKLOAD,5.1,12.9,16.4,healed
+2026-11-27T03:44Z,All pods stuck,RESTART_CONTAINER,4.3,11.2,13.9,healed
+2026-11-27T03:44Z,Bad image rollout,ROLLOUT_UNDO,6.3,,8.3,healed
+2026-11-27T03:44Z,Crashing rollout,ROLLOUT_UNDO,0.8,,9.3,healed
+2026-11-27T03:44Z,One bad pod of three,DELETE_POD,3.7,,10.3,healed
+2026-11-27T03:44Z,Scaled to zero,SCALE_WORKLOAD,3.6,11.3,14.6,healed
